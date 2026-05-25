@@ -3,6 +3,7 @@
   import MapView from "./MapView.svelte";
   import AddressSearch from "./AddressSearch.svelte";
   import PlacesList from "./PlacesList.svelte";
+  import ShareDialog from "./ShareDialog.svelte";
 
   type Place = {
     id: number;
@@ -53,6 +54,7 @@
   let saving = $state(false);
   let editingName = $state(false);
   let editNameValue = $state("");
+  let shareOpen = $state(false);
   let mapView: MapView;
 
   let canEdit = $derived(listDetail?.permissions?.canEdit ?? false);
@@ -231,13 +233,13 @@
           {/if}
         {/if}
         {#if listDetail.permissions.isOwner}
-          <a
-            href={`/-/places/list/${listId}`}
-            class="share-badge"
-            title={`Visibility: ${listDetail.visibility}`}
+          <button
+            type="button"
+            class="share-btn"
+            onclick={() => { shareOpen = true; }}
           >
-            {listDetail.visibility === "private" ? "Private" : listDetail.visibility}
-          </a>
+            Share
+          </button>
         {/if}
       </div>
       {#if error}
@@ -293,6 +295,11 @@
         />
       </main>
     </div>
+    <ShareDialog
+      {listId}
+      open={shareOpen}
+      onClose={() => { shareOpen = false; }}
+    />
   {/if}
 </div>
 
@@ -351,15 +358,16 @@
     border-radius: 3px;
     outline: none;
   }
-  .share-badge {
-    font-size: 0.75em;
-    padding: 2px 8px;
-    border-radius: 9px;
-    background: #eef2f7;
-    color: #4a5568;
-    border: 1px solid #d0d7e0;
-    text-decoration: none;
+  .share-btn {
+    font: inherit;
+    font-size: 0.85em;
+    padding: 4px 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
   }
+  .share-btn:hover { background: #f0f4f8; }
   .error-inline {
     background: #ffd6d6;
     color: #5a0000;
