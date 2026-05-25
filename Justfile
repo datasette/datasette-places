@@ -54,7 +54,7 @@ test *flags:
 # --- Dev server ---
 
 dev *flags:
-    uv run --prerelease=allow \
+  DATASETTE_SECRET=abc123 uv run --prerelease=allow \
         datasette \
             --internal {{INTERNAL_DEV_DB}} \
             -s permissions.datasette-places-list true \

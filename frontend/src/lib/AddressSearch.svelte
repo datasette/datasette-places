@@ -16,35 +16,44 @@
   let results = $state<GeoResult[]>([]);
   let loading = $state(false);
   let showResults = $state(false);
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let errorMsg = $state<string | null>(null);
+  let searched = $state(false);
+  let wrapperEl: HTMLDivElement;
 
   async function search() {
     const q = query.trim();
+    errorMsg = null;
     if (!q) {
       results = [];
       showResults = false;
+      searched = false;
       return;
     }
     loading = true;
+    searched = true;
     try {
       const resp = await fetch(
         `/-/places/api/geocode?q=${encodeURIComponent(q)}`,
         { headers: { "Content-Type": "application/json" } }
       );
-      if (!resp.ok) throw new Error("Search failed");
-      const data = await resp.json();
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        throw new Error(data.error || `Search failed (HTTP ${resp.status}).`);
+      }
       results = data.results || [];
-      showResults = results.length > 0;
-    } catch {
+      showResults = true;
+    } catch (e) {
       results = [];
       showResults = false;
+      errorMsg =
+        e instanceof Error ? e.message : "Something went wrong searching.";
     }
     loading = false;
   }
 
-  function onInput() {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => void search(), 350);
+  function onSubmit(e: SubmitEvent) {
+    e.preventDefault();
+    void search();
   }
 
   function selectResult(r: GeoResult) {
@@ -59,41 +68,56 @@
     }
   }
 
-  function onBlur() {
-    // Delay to allow click on result
-    setTimeout(() => { showResults = false; }, 200);
+  function onBlur(e: FocusEvent) {
+    // Keep results open while focus stays inside the widget (e.g. moving to
+    // the Search button or clicking a result); otherwise hide shortly after.
+    const next = e.relatedTarget as Node | null;
+    if (next && wrapperEl?.contains(next)) return;
+    setTimeout(() => {
+      showResults = false;
+    }, 200);
   }
 </script>
 
-<div class="search-wrapper">
-  <div class="search-input-row">
+<div class="search-wrapper" bind:this={wrapperEl}>
+  <form class="search-input-row" onsubmit={onSubmit}>
     <input
       type="text"
       bind:value={query}
-      oninput={onInput}
       onkeydown={onKeydown}
-      onfocus={() => { if (results.length > 0) showResults = true; }}
+      onfocus={() => {
+        if (results.length > 0) showResults = true;
+      }}
       onblur={onBlur}
       placeholder="Search for an address or place..."
     />
-    {#if loading}
-      <span class="spinner">...</span>
-    {/if}
-  </div>
+    <button
+      type="submit"
+      class="search-btn"
+      disabled={loading || !query.trim()}
+    >
+      {loading ? "..." : "Search"}
+    </button>
+  </form>
+
+  {#if errorMsg}
+    <div class="search-error">{errorMsg}</div>
+  {/if}
 
   {#if showResults}
-    <ul class="results">
-      {#each results as r, i}
-        <li>
-          <button
-            type="button"
-            onclick={() => selectResult(r)}
-          >
-            {r.display_name}
-          </button>
-        </li>
-      {/each}
-    </ul>
+    {#if results.length > 0}
+      <ul class="results">
+        {#each results as r}
+          <li>
+            <button type="button" onclick={() => selectResult(r)}>
+              {r.display_name}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {:else if searched && !loading}
+      <div class="no-results">No matches found for that search.</div>
+    {/if}
   {/if}
 </div>
 
@@ -106,9 +130,11 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    margin: 0;
   }
   input {
     flex: 1;
+    min-width: 0;
     padding: 8px 12px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -120,9 +146,38 @@
     border-color: #0b5cad;
     box-shadow: 0 0 0 2px rgba(11, 92, 173, 0.15);
   }
-  .spinner {
-    color: #888;
+  .search-btn {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border: 1px solid #0b5cad;
+    border-radius: 4px;
+    background: #0b5cad;
+    color: #fff;
+    font: inherit;
+    font-size: 0.9em;
+    cursor: pointer;
+  }
+  .search-btn:hover:not(:disabled) {
+    background: #094a8d;
+  }
+  .search-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .search-error {
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: #ffd6d6;
+    color: #5a0000;
+    border-radius: 4px;
     font-size: 0.85em;
+  }
+  .no-results {
+    margin-top: 6px;
+    padding: 6px 10px;
+    color: #777;
+    font-size: 0.85em;
+    font-style: italic;
   }
   .results {
     position: absolute;
