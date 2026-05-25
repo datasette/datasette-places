@@ -1,0 +1,124 @@
+from collections import defaultdict
+
+from datasette import hookimpl, Response
+from datasette.permissions import Action
+from datasette_vite import vite_entry
+
+from .router import router
+from .permissions import PlacesResource, permission_resources_sql  # noqa: F401
+from . import routes  # noqa: F401 — triggers decorator registration
+
+
+def _method_dispatch_routes(raw_routes):
+    """Combine routes with the same path pattern into method-dispatching views."""
+    by_path = defaultdict(dict)
+    order = []
+
+    for entry in router._routes:
+        path = entry.path
+        method = entry.method.upper()
+        if path not in by_path:
+            order.append(path)
+        by_path[path][method] = entry.fn
+
+    result = []
+    for path in order:
+        method_map = by_path[path]
+        if len(method_map) == 1:
+            result.append((path, next(iter(method_map.values()))))
+        else:
+
+            def _make_dispatcher(m):
+                async def dispatcher(
+                    request,
+                    datasette=None,
+                    scope=None,
+                    receive=None,
+                    send=None,
+                ):
+                    method = request.method.upper()
+                    handler = m.get(method)
+                    if handler is None:
+                        allowed = ", ".join(sorted(m.keys()))
+                        return Response(
+                            f"Method {method} not allowed",
+                            status=405,
+                            headers={"Allow": allowed},
+                        )
+                    return await handler(
+                        request,
+                        datasette=datasette,
+                        scope=scope,
+                        receive=receive,
+                        send=send,
+                    )
+
+                return dispatcher
+
+            result.append((path, _make_dispatcher(dict(method_map))))
+
+    return result
+
+
+@hookimpl
+def extra_template_vars(datasette):
+    return {
+        "datasette_places_vite_entry": vite_entry(
+            datasette=datasette,
+            plugin_package="datasette_places",
+        ),
+    }
+
+
+@hookimpl
+def register_routes():
+    return _method_dispatch_routes(router._routes)
+
+
+@hookimpl
+def register_actions(datasette):
+    return [
+        Action(
+            name="datasette-places-list",
+            description="Can list place lists (see the index page)",
+        ),
+        Action(
+            name="datasette-places-create",
+            description="Can create new place lists",
+            also_requires="datasette-places-list",
+        ),
+        Action(
+            name="datasette-places-view",
+            description="Can view a specific place list",
+            resource_class=PlacesResource,
+        ),
+        Action(
+            name="datasette-places-edit",
+            description="Can edit a specific place list",
+            resource_class=PlacesResource,
+            also_requires="datasette-places-view",
+        ),
+    ]
+
+
+@hookimpl
+def menu_links(datasette, actor, request=None):
+    async def inner():
+        if await datasette.allowed(action="datasette-places-list", actor=actor):
+            return [
+                {
+                    "href": datasette.urls.path("/-/places/"),
+                    "label": "Places",
+                }
+            ]
+        return []
+
+    return inner
+
+
+@hookimpl
+async def startup(datasette):
+    from .migrations import ensure_migrations
+
+    internal = datasette.get_internal_database()
+    await ensure_migrations(internal)
