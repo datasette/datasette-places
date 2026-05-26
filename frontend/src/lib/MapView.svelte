@@ -198,7 +198,7 @@
   onMount(() => {
     map = L.map(mapEl, { zoomControl: true }).setView([30, 10], 4);
 
-    // Base layers — satellite by default.
+    // Base layers — street by default.
     const street = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19,
@@ -221,10 +221,10 @@
       maxZoom: 17,
     });
 
-    satellite.addTo(map);
+    street.addTo(map);
     L.control
       .layers(
-        { Satellite: satellite, Street: street, Terrain: terrain },
+        { Street: street, Satellite: satellite, Terrain: terrain },
         {},
         { position: "topright" }
       )
