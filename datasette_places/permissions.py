@@ -1,25 +1,62 @@
 """Permission model for datasette-places.
 
-Four actions:
-    - ``datasette-places-list``    (global)          — see the index page
-    - ``datasette-places-create``  (global)          — create new lists
-    - ``datasette-places-view``    (PlacesResource)  — view a specific list
-    - ``datasette-places-edit``    (PlacesResource)  — edit a specific list
+Per-list access is answered by **datasette-acl**: the ``places-view`` /
+``places-edit`` / ``places-manage`` actions resolve against acl grants on the
+:class:`PlacesListResource` resource (type ``places-list``). places no longer
+ships owner/shared/visibility permission SQL — owner semantics come from a
+Manager grant seeded for ``created_by`` on create (see
+:func:`seed_owner_manager_grant`); shares and general access are acl grants
+written through the share UI / data migration.
 
-Per-list actions resolved via permission_resources_sql with three rule
-sets: owner, shared, visibility.
+Unlike datasette-paper, places has no ``locked`` read-only flag, so it keeps
+**no** bespoke permission SQL at all — every per-list check goes through acl.
+
+Two global actions remain config-driven (handled by Datasette's standard
+config-permissions plugin from the ``permissions:`` block):
+
+    - ``datasette-places-list``    — see the index page + list endpoint
+    - ``datasette-places-create``  — POST /-/places/api/lists
 """
 
 from __future__ import annotations
 
-from datasette import hookimpl
-from datasette.permissions import PermissionSQL, Resource
+from datasette.permissions import Resource
+
+try:  # acl is a soft dependency — the roles hook + grant seeding no-op when absent.
+    from datasette_acl.roles import AclRole
+except ImportError:  # pragma: no cover
+    AclRole = None
+
+try:
+    from datasette_acl.grants import grant as _acl_grant
+except ImportError:  # pragma: no cover
+    _acl_grant = None
 
 
-class PlacesResource(Resource):
-    """A single place list. Single-level: list_id in parent, child=None."""
+# Resource type name for the acl-backed model.
+PLACES_LIST_RESOURCE_TYPE = "places-list"
 
-    name = "places"
+# Resource-scoped actions, resolved by datasette-acl against grants on
+# PlacesListResource.
+PLACES_LIST_ACTIONS = (
+    "places-view",
+    "places-edit",
+    "places-manage",
+)
+
+
+class PlacesListResource(Resource):
+    """A single place list, acl-backed (resource type ``places-list``).
+
+    Parent-only resource: the list id is the ``parent`` and ``child`` is
+    ``None``. This is the model the ``places-view`` / ``places-edit`` /
+    ``places-manage`` actions resolve against via datasette-acl's
+    ``permission_resources_sql`` and grant helpers. The single positional
+    argument is the list id, matching acl's ``build_resource`` convention for
+    parent-only types (``rc(parent)``).
+    """
+
+    name = PLACES_LIST_RESOURCE_TYPE
     parent_class = None
 
     def __init__(self, list_id):
@@ -33,60 +70,28 @@ class PlacesResource(Resource):
         )
 
 
-@hookimpl
-async def permission_resources_sql(datasette, actor, action):
-    if action not in ("datasette-places-view", "datasette-places-edit"):
-        return None
+async def seed_owner_manager_grant(datasette, list_id, created_by) -> None:
+    """Grant the list creator the Manager role on the new list.
 
-    actor_id = actor.get("id") if actor else None
-    is_edit = action == "datasette-places-edit"
-    role_filter = "AND s.role = 'editor'" if is_edit else ""
-
-    rules = [
-        # Owner rule
-        PermissionSQL(
-            sql=(
-                "SELECT CAST(id AS TEXT) AS parent, NULL AS child, "
-                "1 AS allow, 'owner' AS reason "
-                "FROM _datasette_places_list "
-                "WHERE :_places_aid IS NOT NULL AND created_by = :_places_aid"
-            ),
-            params={"_places_aid": actor_id},
-        ),
-        # Explicit per-actor shares
-        PermissionSQL(
-            sql=(
-                "SELECT CAST(s.list_id AS TEXT) AS parent, NULL AS child, "
-                "1 AS allow, 'shared' AS reason "
-                "FROM _datasette_places_share s "
-                "WHERE :_places_aid IS NOT NULL AND s.actor_id = :_places_aid "
-                f"{role_filter}"
-            ),
-            params={"_places_aid": actor_id},
-        ),
-    ]
-
-    # Visibility-based grants
-    if await datasette.allowed(action="datasette-places-list", actor=actor):
-        if action == "datasette-places-view":
-            visibilities = "('link-view','link-edit')"
-        else:
-            visibilities = "('link-edit')"
-        rules.append(
-            PermissionSQL(
-                sql=(
-                    "SELECT CAST(id AS TEXT) AS parent, NULL AS child, "
-                    "1 AS allow, 'visibility' AS reason "
-                    f"FROM _datasette_places_list WHERE visibility IN {visibilities}"
-                ),
-            )
-        )
-
-    return rules
+    Replaces the old ``created_by``-based owner SQL: ownership is now an acl
+    Manager grant on the ``places-list`` resource. No-op for anonymous creates
+    (``created_by`` falsy — anonymous actors never own) and when acl isn't
+    installed.
+    """
+    if not created_by or _acl_grant is None:
+        return
+    await _acl_grant(
+        datasette,
+        PLACES_LIST_RESOURCE_TYPE,
+        str(list_id),
+        actor_id=str(created_by),
+        role="Manager",
+        by_actor=str(created_by),
+    )
 
 
 # ---------------------------------------------------------------------------
-# Per-action helpers
+# Per-action helpers used by route handlers
 # ---------------------------------------------------------------------------
 
 
@@ -104,15 +109,38 @@ async def ensure_places_create(datasette, request) -> None:
 
 async def ensure_places_view(datasette, request, list_id) -> None:
     await datasette.ensure_permission(
-        action="datasette-places-view",
-        resource=PlacesResource(list_id),
+        action="places-view",
+        resource=PlacesListResource(list_id),
         actor=request.actor,
     )
 
 
 async def ensure_places_edit(datasette, request, list_id) -> None:
     await datasette.ensure_permission(
-        action="datasette-places-edit",
-        resource=PlacesResource(list_id),
+        action="places-edit",
+        resource=PlacesListResource(list_id),
         actor=request.actor,
+    )
+
+
+async def can_places_edit(datasette, actor, list_id) -> bool:
+    """Like ensure_places_edit but returns True/False without raising."""
+    return await datasette.allowed(
+        action="places-edit",
+        resource=PlacesListResource(list_id),
+        actor=actor,
+    )
+
+
+async def can_places_manage(datasette, actor, list_id) -> bool:
+    """True when ``actor`` may manage sharing for ``list_id``.
+
+    Manage is the acl Manager-only capability (the owner gets it via the
+    seeded Manager grant). Used in place of the old inline ``created_by``
+    -equality owner check.
+    """
+    return await datasette.allowed(
+        action="places-manage",
+        resource=PlacesListResource(list_id),
+        actor=actor,
     )

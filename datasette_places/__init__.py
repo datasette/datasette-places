@@ -5,7 +5,11 @@ from datasette.permissions import Action
 from datasette_vite import vite_entry
 
 from .router import router
-from .permissions import PlacesResource, permission_resources_sql  # noqa: F401
+from .permissions import (  # noqa: F401
+    AclRole,
+    PlacesListResource,
+    PLACES_LIST_RESOURCE_TYPE,
+)
 from . import routes  # noqa: F401 — triggers decorator registration
 
 
@@ -78,6 +82,7 @@ def register_routes():
 @hookimpl
 def register_actions(datasette):
     return [
+        # --- Global actions (unchanged) -------------------------------------
         Action(
             name="datasette-places-list",
             description="Can list place lists (see the index page)",
@@ -87,16 +92,61 @@ def register_actions(datasette):
             description="Can create new place lists",
             also_requires="datasette-places-list",
         ),
+        # --- acl-backed resource actions ------------------------------------
+        # These resolve against datasette-acl grants on PlacesListResource.
+        # Every per-list permission check goes through these; places no longer
+        # ships owner/shared/visibility SQL.
         Action(
-            name="datasette-places-view",
-            description="Can view a specific place list",
-            resource_class=PlacesResource,
+            name="places-view",
+            description="View a place list",
+            resource_class=PlacesListResource,
         ),
         Action(
-            name="datasette-places-edit",
-            description="Can edit a specific place list",
-            resource_class=PlacesResource,
-            also_requires="datasette-places-view",
+            name="places-edit",
+            description="Edit a place list",
+            resource_class=PlacesListResource,
+            also_requires="places-view",
+        ),
+        Action(
+            name="places-manage",
+            description="Manage sharing for a place list",
+            resource_class=PlacesListResource,
+            also_requires="places-view",
+        ),
+    ]
+
+
+@hookimpl
+def datasette_acl_roles(datasette):
+    """Friendly Viewer / Editor / Manager roles for the ``places-list`` type.
+
+    Consumed by datasette-acl's role registry (see ``build_roles_registry``).
+    No-op when acl is not installed (``AclRole is None``).
+    """
+    if AclRole is None:
+        return []
+    return [
+        AclRole(
+            resource_type=PLACES_LIST_RESOURCE_TYPE,
+            name="Viewer",
+            actions=["places-view"],
+            rank=1,
+            description="Can view the list",
+        ),
+        AclRole(
+            resource_type=PLACES_LIST_RESOURCE_TYPE,
+            name="Editor",
+            actions=["places-view", "places-edit"],
+            rank=2,
+            description="Can view and edit the list",
+        ),
+        AclRole(
+            resource_type=PLACES_LIST_RESOURCE_TYPE,
+            name="Manager",
+            actions=["places-view", "places-edit", "places-manage"],
+            rank=3,
+            manage=True,
+            description="Can view, edit, and manage sharing",
         ),
     ]
 

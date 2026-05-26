@@ -19,10 +19,17 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "datasette-acl",
     "pytest",
     "pytest-asyncio",
     "ruff>=0.15.0",
 ]
+
+# Local-only: the sharing-v2 acl engine is a sibling checkout, not yet
+# published. Referenced from the dev group so places' new places-list grants
+# resolve through acl in tests.
+[tool.uv.sources]
+datasette-acl = { path = "../datasette-acl", editable = true }
 
 [build-system]
 requires = ["setuptools"]
