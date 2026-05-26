@@ -638,11 +638,20 @@
 
   @media (max-width: 768px) {
     .app-body { flex-direction: column-reverse; }
+    /* Let the map shrink to share space with the bottom list panel. */
+    .map-area { flex: 1; min-height: 0; }
     .sidebar {
       width: 100%;
-      max-height: 40vh;
+      flex: none;
+      height: 42vh;
+      max-height: none;
       border-right: none;
       border-top: 1px solid #ddd;
+    }
+    /* Wider search, clear of the zoom/layers controls on small screens. */
+    .map-search-overlay {
+      width: calc(100% - 88px);
+      top: 8px;
     }
   }
 </style>

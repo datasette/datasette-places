@@ -282,6 +282,12 @@
     height: 100%;
     min-height: 400px;
   }
+  @media (max-width: 768px) {
+    /* Fill the flexed map area instead of forcing 400px on short screens. */
+    .map-container {
+      min-height: 0;
+    }
+  }
   :global(.map-container.add-mode) {
     cursor: crosshair;
   }
