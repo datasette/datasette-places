@@ -18,11 +18,14 @@
   let showResults = $state(false);
   let errorMsg = $state<string | null>(null);
   let searched = $state(false);
+  let activeIndex = $state(-1);
   let wrapperEl: HTMLDivElement;
+  let resultsEl = $state<HTMLUListElement | null>(null);
 
   async function search() {
     const q = query.trim();
     errorMsg = null;
+    activeIndex = -1;
     if (!q) {
       results = [];
       showResults = false;
@@ -58,13 +61,37 @@
 
   function selectResult(r: GeoResult) {
     showResults = false;
+    activeIndex = -1;
     query = r.display_name;
     onSelect(r);
+  }
+
+  function moveActive(delta: number) {
+    if (!showResults || results.length === 0) return;
+    const count = results.length;
+    // Wrap around, treating -1 (nothing active) as the slot before the first.
+    activeIndex = (activeIndex + delta + count + 1) % (count + 1) - 1;
+    if (activeIndex >= 0) {
+      resultsEl?.children[activeIndex]?.scrollIntoView({ block: "nearest" });
+    }
   }
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
       showResults = false;
+      activeIndex = -1;
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      moveActive(1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      moveActive(-1);
+    } else if (e.key === "Enter") {
+      // When a result is highlighted, pick it instead of running a new search.
+      if (showResults && activeIndex >= 0 && results[activeIndex]) {
+        e.preventDefault();
+        selectResult(results[activeIndex]);
+      }
     }
   }
 
@@ -106,10 +133,15 @@
 
   {#if showResults}
     {#if results.length > 0}
-      <ul class="results">
-        {#each results as r}
+      <ul class="results" bind:this={resultsEl}>
+        {#each results as r, i}
           <li>
-            <button type="button" onclick={() => selectResult(r)}>
+            <button
+              type="button"
+              class:active={i === activeIndex}
+              onclick={() => selectResult(r)}
+              onmouseenter={() => (activeIndex = i)}
+            >
               {r.display_name}
             </button>
           </li>
@@ -211,7 +243,8 @@
     line-height: 1.4;
     color: #333;
   }
-  .results button:hover {
+  .results button:hover,
+  .results button.active {
     background: #f0f4f8;
   }
 </style>
