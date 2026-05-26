@@ -59,6 +59,13 @@
   let editingDesc = $state(false);
   let editDescValue = $state("");
   let geocodingClick = $state(false);
+  // Editable title for a place being added (defaults from the address).
+  let previewName = $state("");
+
+  /** First, most-specific part of a comma-separated address — a sane title default. */
+  function shortLabel(label: string): string {
+    return label.split(",")[0].trim() || label;
+  }
 
   let canEdit = $derived(listDetail?.permissions?.canEdit ?? false);
 
@@ -102,6 +109,7 @@
       longitude: result.longitude,
       name: result.display_name,
     };
+    previewName = shortLabel(result.display_name);
   }
 
   async function savePreviewAsPlace() {
@@ -112,7 +120,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: previewPin.name,
+          name: previewName.trim() || previewPin.name,
           address: previewPin.name,
           latitude: previewPin.latitude,
           longitude: previewPin.longitude,
@@ -122,6 +130,7 @@
       const place = await resp.json();
       places = [...places, place];
       previewPin = null;
+      previewName = "";
       selectedId = place.id;
     } catch {
       error = "Failed to save place";
@@ -131,6 +140,7 @@
 
   function cancelPreview() {
     previewPin = null;
+    previewName = "";
   }
 
   function onSelectPlace(id: number) {
@@ -176,6 +186,7 @@
     // address via reverse geocoding and upgrade the label when it arrives.
     const coordLabel = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
     previewPin = { latitude: lat, longitude: lon, name: coordLabel };
+    previewName = coordLabel;
     geocodingClick = true;
     try {
       const resp = await fetch(
@@ -192,6 +203,8 @@
           data.display_name
         ) {
           previewPin = { ...previewPin, name: data.display_name };
+          // Upgrade the title default too, unless the user already edited it.
+          if (previewName === coordLabel) previewName = shortLabel(data.display_name);
         }
       }
     } catch {
@@ -351,24 +364,37 @@
           <div class="search-section">
             <AddressSearch onSelect={onSearchSelect} />
             {#if previewPin}
-              <div class="preview-actions">
-                <span class="preview-label" title={previewPin.name}>
-                  {previewPin.name.length > 40
-                    ? previewPin.name.slice(0, 40) + "..."
+              <div class="preview-card">
+                <input
+                  type="text"
+                  class="preview-name"
+                  bind:value={previewName}
+                  placeholder="Place name"
+                  aria-label="Place name"
+                  onkeydown={(e) => {
+                    if (e.key === "Enter") void savePreviewAsPlace();
+                    if (e.key === "Escape") cancelPreview();
+                  }}
+                />
+                <div class="preview-label" title={previewPin.name}>
+                  {previewPin.name.length > 48
+                    ? previewPin.name.slice(0, 48) + "..."
                     : previewPin.name}
                   {#if geocodingClick}<em class="lookup">finding address…</em>{/if}
-                </span>
-                <button
-                  type="button"
-                  class="btn-save"
-                  disabled={saving}
-                  onclick={savePreviewAsPlace}
-                >
-                  {saving ? "Saving..." : "Save place"}
-                </button>
-                <button type="button" class="btn-cancel" onclick={cancelPreview}>
-                  Cancel
-                </button>
+                </div>
+                <div class="preview-buttons">
+                  <button
+                    type="button"
+                    class="btn-save"
+                    disabled={saving}
+                    onclick={savePreviewAsPlace}
+                  >
+                    {saving ? "Saving..." : "Save place"}
+                  </button>
+                  <button type="button" class="btn-cancel" onclick={cancelPreview}>
+                    Cancel
+                  </button>
+                </div>
               </div>
             {/if}
           </div>
@@ -541,21 +567,39 @@
     padding: 12px;
     border-bottom: 1px solid #eee;
   }
-  .preview-actions {
+  .preview-card {
     margin-top: 8px;
+    padding: 8px;
+    border: 1px solid #e3e3e3;
+    border-radius: 5px;
+    background: #fafbfc;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 6px;
-    flex-wrap: wrap;
+  }
+  .preview-name {
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.95em;
+    padding: 5px 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    outline: none;
+  }
+  .preview-name:focus {
+    border-color: #0b5cad;
+    box-shadow: 0 0 0 2px rgba(11, 92, 173, 0.15);
   }
   .preview-label {
-    font-size: 0.85em;
-    color: #555;
-    flex: 1;
-    min-width: 0;
+    font-size: 0.8em;
+    color: #777;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .preview-buttons {
+    display: flex;
+    gap: 6px;
   }
   .lookup { color: #999; font-size: 0.9em; }
   .btn-save, .btn-cancel {
