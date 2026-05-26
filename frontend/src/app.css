@@ -15,3 +15,29 @@ body {
 #app-root {
   min-height: 100vh;
 }
+
+/*
+ * Fullscreen map mode (set by the list page via a body class).
+ * Make the datasette content area fill the viewport below the nav so the
+ * map can run edge-to-edge, with the list rendered as a floating panel.
+ */
+body.places-fullscreen {
+  overflow: hidden;
+}
+body.places-fullscreen .not-footer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+body.places-fullscreen section.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+}
+body.places-fullscreen #app-root {
+  height: 100%;
+  min-height: 0;
+}
+body.places-fullscreen footer.ft {
+  display: none;
+}

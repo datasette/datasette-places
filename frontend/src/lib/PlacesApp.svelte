@@ -280,6 +280,9 @@
 
   onMount(() => {
     void loadData();
+    // Let the map run fullscreen beneath datasette's nav (see app.css).
+    document.body.classList.add("places-fullscreen");
+    return () => document.body.classList.remove("places-fullscreen");
   });
 </script>
 
@@ -289,138 +292,136 @@
   {:else if error && !listDetail}
     <div class="error-screen">{error}</div>
   {:else if listDetail}
-    <header class="app-header">
-      <a href="/-/places/" class="back-link">&larr; All Lists</a>
-      <div class="title-row">
-        {#if editingName}
-          <input
-            type="text"
-            class="title-input"
-            bind:value={editNameValue}
-            onkeydown={(e) => {
-              if (e.key === "Enter") void saveListName();
-              if (e.key === "Escape") editingName = false;
-            }}
-            onblur={() => void saveListName()}
-          />
-        {:else}
-          {#if canEdit}
-            <h1><button type="button" class="title-btn" onclick={startEditName}>{listDetail.name}</button></h1>
-          {:else}
-            <h1>{listDetail.name}</h1>
-          {/if}
-        {/if}
-        {#if listDetail.permissions.isOwner}
-          <button
-            type="button"
-            class="share-btn"
-            onclick={() => { shareOpen = true; }}
-          >
-            Share
-          </button>
-        {/if}
-      </div>
-
-      {#if editingDesc}
-        <textarea
-          class="desc-input"
-          bind:value={editDescValue}
-          rows="2"
-          placeholder="Add a description for this map..."
-          onkeydown={(e) => {
-            if (e.key === "Escape") editingDesc = false;
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void saveListDescription();
-          }}
-          onblur={() => void saveListDescription()}
-        ></textarea>
-      {:else if listDetail.description}
-        {#if canEdit}
-          <button type="button" class="desc-btn" onclick={startEditDesc} title="Edit description">
-            {listDetail.description}
-          </button>
-        {:else}
-          <p class="desc">{listDetail.description}</p>
-        {/if}
-      {:else if canEdit}
-        <button type="button" class="desc-add" onclick={startEditDesc}>
-          + Add description
-        </button>
-      {/if}
-
-      <div class="meta-line">
-        {places.length}
-        {places.length === 1 ? "place" : "places"}
-        · edited {relativeTime(listDetail.updated_at)}
-      </div>
-
-      {#if error}
-        <div class="error-inline">{error}</div>
-      {/if}
-    </header>
-
-    <div class="app-body">
-      <aside class="sidebar">
-        <PlacesList
-          {places}
-          {selectedId}
-          {canEdit}
-          onSelectPlace={onSelectPlace}
-          onDeletePlace={onDeletePlace}
-          onUpdatePlace={onUpdatePlace}
-        />
-      </aside>
-
-      <main class="map-area">
-        {#if canEdit}
-          <div class="map-search-overlay">
-            <AddressSearch onSelect={onSearchSelect} />
-            {#if previewPin}
-              <div class="preview-card">
-                <input
-                  type="text"
-                  class="preview-name"
-                  bind:value={previewName}
-                  placeholder="Place name"
-                  aria-label="Place name"
-                  onkeydown={(e) => {
-                    if (e.key === "Enter") void savePreviewAsPlace();
-                    if (e.key === "Escape") cancelPreview();
-                  }}
-                />
-                <div class="preview-label" title={previewPin.name}>
-                  {previewPin.name.length > 48
-                    ? previewPin.name.slice(0, 48) + "..."
-                    : previewPin.name}
-                  {#if geocodingClick}<em class="lookup">finding address…</em>{/if}
-                </div>
-                <div class="preview-buttons">
-                  <button
-                    type="button"
-                    class="btn-save"
-                    disabled={saving}
-                    onclick={savePreviewAsPlace}
-                  >
-                    {saving ? "Saving..." : "Save place"}
-                  </button>
-                  <button type="button" class="btn-cancel" onclick={cancelPreview}>
-                    Cancel
-                  </button>
-                </div>
+    <main class="map-area">
+      {#if canEdit}
+        <div class="map-search-overlay">
+          <AddressSearch onSelect={onSearchSelect} />
+          {#if previewPin}
+            <div class="preview-card">
+              <input
+                type="text"
+                class="preview-name"
+                bind:value={previewName}
+                placeholder="Place name"
+                aria-label="Place name"
+                onkeydown={(e) => {
+                  if (e.key === "Enter") void savePreviewAsPlace();
+                  if (e.key === "Escape") cancelPreview();
+                }}
+              />
+              <div class="preview-label" title={previewPin.name}>
+                {previewPin.name.length > 48
+                  ? previewPin.name.slice(0, 48) + "..."
+                  : previewPin.name}
+                {#if geocodingClick}<em class="lookup">finding address…</em>{/if}
               </div>
+              <div class="preview-buttons">
+                <button
+                  type="button"
+                  class="btn-save"
+                  disabled={saving}
+                  onclick={savePreviewAsPlace}
+                >
+                  {saving ? "Saving..." : "Save place"}
+                </button>
+                <button type="button" class="btn-cancel" onclick={cancelPreview}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/if}
+      <MapView
+        places={mapPlaces}
+        {selectedId}
+        {previewPin}
+        {canEdit}
+        onSelectPlace={onSelectPlace}
+        onMapClick={onMapClick}
+        onMovePlace={onMovePlace}
+      />
+    </main>
+
+    <aside class="floating-panel">
+      <div class="panel-header">
+        <a href="/-/places/" class="back-link">&larr; All Lists</a>
+        <div class="title-row">
+          {#if editingName}
+            <input
+              type="text"
+              class="title-input"
+              bind:value={editNameValue}
+              onkeydown={(e) => {
+                if (e.key === "Enter") void saveListName();
+                if (e.key === "Escape") editingName = false;
+              }}
+              onblur={() => void saveListName()}
+            />
+          {:else}
+            {#if canEdit}
+              <h1><button type="button" class="title-btn" onclick={startEditName}>{listDetail.name}</button></h1>
+            {:else}
+              <h1>{listDetail.name}</h1>
             {/if}
-          </div>
+          {/if}
+          {#if listDetail.permissions.isOwner}
+            <button
+              type="button"
+              class="share-btn"
+              onclick={() => { shareOpen = true; }}
+            >
+              Share
+            </button>
+          {/if}
+        </div>
+
+        {#if editingDesc}
+          <textarea
+            class="desc-input"
+            bind:value={editDescValue}
+            rows="2"
+            placeholder="Add a description for this map..."
+            onkeydown={(e) => {
+              if (e.key === "Escape") editingDesc = false;
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void saveListDescription();
+            }}
+            onblur={() => void saveListDescription()}
+          ></textarea>
+        {:else if listDetail.description}
+          {#if canEdit}
+            <button type="button" class="desc-btn" onclick={startEditDesc} title="Edit description">
+              {listDetail.description}
+            </button>
+          {:else}
+            <p class="desc">{listDetail.description}</p>
+          {/if}
+        {:else if canEdit}
+          <button type="button" class="desc-add" onclick={startEditDesc}>
+            + Add description
+          </button>
         {/if}
-        <MapView
-          places={mapPlaces}
-          {selectedId}
-          {previewPin}
-          {canEdit}
-          onSelectPlace={onSelectPlace}
-          onMapClick={onMapClick}
-          onMovePlace={onMovePlace}
-        />
-      </main>
-    </div>
+
+        <div class="meta-line">
+          {places.length}
+          {places.length === 1 ? "place" : "places"}
+          · edited {relativeTime(listDetail.updated_at)}
+        </div>
+
+        {#if error}
+          <div class="error-inline">{error}</div>
+        {/if}
+      </div>
+
+      <PlacesList
+        {places}
+        {selectedId}
+        {canEdit}
+        onSelectPlace={onSelectPlace}
+        onDeletePlace={onDeletePlace}
+        onUpdatePlace={onUpdatePlace}
+      />
+    </aside>
     <ShareDialog
       {listId}
       open={shareOpen}
@@ -431,25 +432,39 @@
 
 <style>
   .places-app {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
+    position: relative;
+    height: 100%;
     overflow: hidden;
   }
   .loading-screen, .error-screen {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    height: 100%;
     font-size: 1.1em;
     color: #666;
   }
   .error-screen { color: #8a1a1a; }
 
-  .app-header {
-    padding: 10px 16px;
-    border-bottom: 1px solid #ddd;
+  /* Floating list panel layered over the fullscreen map. */
+  .floating-panel {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 700;
+    width: 340px;
+    max-width: calc(100% - 28px);
+    max-height: calc(100% - 28px);
     background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.28);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid #eee;
     flex-shrink: 0;
   }
   .back-link {
@@ -549,24 +564,14 @@
     color: #888;
   }
 
-  .app-body {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
-  .sidebar {
-    width: 360px;
-    min-width: 280px;
-    border-right: 1px solid #ddd;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: #fff;
+  .floating-panel :global(.places-list) {
+    min-height: 0;
   }
   .map-search-overlay {
     position: absolute;
     top: 10px;
-    left: 50%;
+    /* Centered in the map area to the right of the floating panel. */
+    left: calc(50% + 175px);
     transform: translateX(-50%);
     z-index: 600;
     width: min(380px, calc(100% - 110px));
@@ -632,24 +637,24 @@
   .btn-cancel:hover { background: #f0f0f0; }
 
   .map-area {
-    flex: 1;
-    position: relative;
+    position: absolute;
+    inset: 0;
   }
 
   @media (max-width: 768px) {
-    .app-body { flex-direction: column-reverse; }
-    /* Let the map shrink to share space with the bottom list panel. */
-    .map-area { flex: 1; min-height: 0; }
-    .sidebar {
+    /* List becomes a bottom sheet; map stays fullscreen behind it. */
+    .floating-panel {
+      top: auto;
+      bottom: 0;
+      left: 0;
       width: 100%;
-      flex: none;
-      height: 42vh;
-      max-height: none;
-      border-right: none;
-      border-top: 1px solid #ddd;
+      max-width: 100%;
+      max-height: 45vh;
+      border-radius: 12px 12px 0 0;
     }
-    /* Wider search, clear of the zoom/layers controls on small screens. */
+    /* Re-center the search across the full width, clear of the controls. */
     .map-search-overlay {
+      left: 50%;
       width: calc(100% - 88px);
       top: 8px;
     }

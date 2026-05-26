@@ -196,7 +196,10 @@
   });
 
   onMount(() => {
-    map = L.map(mapEl, { zoomControl: true }).setView([30, 10], 4);
+    // Zoom on the top-right: the floating list panel covers the top-left, and
+    // Leaflet controls render above it.
+    map = L.map(mapEl, { zoomControl: false }).setView([30, 10], 4);
+    L.control.zoom({ position: "topright" }).addTo(map);
 
     // Base layers — street by default.
     const street = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -239,7 +242,14 @@
     renderMarkers();
     if (places.length > 0) fitBounds();
 
+    // Recompute tile layout when the container resizes (fullscreen layout
+    // settling, sidebar/orientation changes) — Leaflet only auto-handles
+    // window resizes, not container ones.
+    const ro = new ResizeObserver(() => map?.invalidateSize());
+    ro.observe(mapEl);
+
     return () => {
+      ro.disconnect();
       map?.remove();
     };
   });
@@ -323,11 +333,20 @@
 
   .map-toolbar {
     position: absolute;
-    bottom: 18px;
-    left: 10px;
+    bottom: 24px;
+    right: 12px;
     z-index: 500;
     display: flex;
     gap: 6px;
+  }
+  @media (max-width: 768px) {
+    /* The bottom sheet covers the bottom — move below the search instead. */
+    .map-toolbar {
+      bottom: auto;
+      right: auto;
+      top: 54px;
+      left: 10px;
+    }
   }
   .tool-btn {
     display: inline-flex;
