@@ -6,7 +6,12 @@ from datasette import Response
 
 from ..router import router
 from ..permissions import ensure_places_list
-from ..geocoding import GeocodingError, geocode_search, reverse_geocode
+from ..geocoding import (
+    DEFAULT_OPENCAGE_API_URL,
+    GeocodingError,
+    geocode_search,
+    reverse_geocode,
+)
 
 logger = logging.getLogger("datasette_places.geocode")
 
@@ -15,6 +20,12 @@ def _get_api_key(datasette) -> str | None:
     """Read the OpenCage API key from plugin config."""
     config = datasette.plugin_config("datasette-places") or {}
     return config.get("opencage_api_key")
+
+
+def _get_base_url(datasette) -> str:
+    """Read the OpenCage base URL from plugin config, falling back to the default."""
+    config = datasette.plugin_config("datasette-places") or {}
+    return config.get("opencage_base_url") or DEFAULT_OPENCAGE_API_URL
 
 
 def _no_key_response():
@@ -37,7 +48,7 @@ async def api_geocode(datasette, request):
     if not query:
         return Response.json({"error": "Search query is required."}, status=400)
     try:
-        results = await geocode_search(query, api_key)
+        results = await geocode_search(query, api_key, _get_base_url(datasette))
     except GeocodingError as e:
         return Response.json({"error": str(e)}, status=e.status)
     except Exception:
@@ -64,7 +75,7 @@ async def api_reverse_geocode(datasette, request):
             status=400,
         )
     try:
-        result = await reverse_geocode(lat, lon, api_key)
+        result = await reverse_geocode(lat, lon, api_key, _get_base_url(datasette))
     except GeocodingError as e:
         return Response.json({"error": str(e)}, status=e.status)
     except Exception:

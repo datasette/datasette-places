@@ -12,7 +12,7 @@ import httpx
 
 logger = logging.getLogger("datasette_places.geocoding")
 
-OPENCAGE_API_URL = "https://api.opencagedata.com/geocode/v1/json"
+DEFAULT_OPENCAGE_API_URL = "https://api.opencagedata.com/geocode/v1/json"
 
 
 class GeocodingError(Exception):
@@ -27,8 +27,13 @@ class GeocodingError(Exception):
         self.status = status
 
 
-async def _opencage_request(query: str, api_key: str, limit: int) -> list[dict]:
+async def _opencage_request(
+    query: str, api_key: str, limit: int, base_url: str = DEFAULT_OPENCAGE_API_URL
+) -> list[dict]:
     """Call OpenCage and return normalized results.
+
+    ``base_url`` is the OpenCage geocoding endpoint, configurable to support
+    self-hosted or alternate (e.g. staging) deployments.
 
     Raises ``GeocodingError`` with a user-facing message (and logs the
     underlying cause) for any network, timeout, or upstream API failure.
@@ -36,7 +41,7 @@ async def _opencage_request(query: str, api_key: str, limit: int) -> list[dict]:
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                OPENCAGE_API_URL,
+                base_url,
                 params={
                     "q": query,
                     "key": api_key,
@@ -104,12 +109,18 @@ def _client_message(status_code: int, upstream_message: str) -> str:
     return f"Geocoding service error (HTTP {status_code})."
 
 
-async def geocode_search(query: str, api_key: str) -> list[dict]:
+async def geocode_search(
+    query: str, api_key: str, base_url: str = DEFAULT_OPENCAGE_API_URL
+) -> list[dict]:
     """Forward geocode: text query → list of results."""
-    return await _opencage_request(query, api_key, limit=5)
+    return await _opencage_request(query, api_key, limit=5, base_url=base_url)
 
 
-async def reverse_geocode(lat: float, lon: float, api_key: str) -> dict | None:
+async def reverse_geocode(
+    lat: float, lon: float, api_key: str, base_url: str = DEFAULT_OPENCAGE_API_URL
+) -> dict | None:
     """Reverse geocode: lat/lon → address."""
-    results = await _opencage_request(f"{lat},{lon}", api_key, limit=1)
+    results = await _opencage_request(
+        f"{lat},{lon}", api_key, limit=1, base_url=base_url
+    )
     return results[0] if results else None
