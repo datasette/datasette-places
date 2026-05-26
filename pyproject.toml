@@ -1,6 +1,6 @@
 [project]
 name = "datasette-places"
-version = "0.0.1a1"
+version = "0.0.1a2"
 description = "Datasette plugin for creating and sharing lists of places on a map"
 readme = "README.md"
 license = "Apache-2.0"
