@@ -317,8 +317,8 @@
 
   .map-toolbar {
     position: absolute;
-    top: 10px;
-    left: 50px;
+    bottom: 18px;
+    left: 10px;
     z-index: 500;
     display: flex;
     gap: 6px;

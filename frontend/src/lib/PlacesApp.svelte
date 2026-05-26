@@ -360,8 +360,19 @@
 
     <div class="app-body">
       <aside class="sidebar">
+        <PlacesList
+          {places}
+          {selectedId}
+          {canEdit}
+          onSelectPlace={onSelectPlace}
+          onDeletePlace={onDeletePlace}
+          onUpdatePlace={onUpdatePlace}
+        />
+      </aside>
+
+      <main class="map-area">
         {#if canEdit}
-          <div class="search-section">
+          <div class="map-search-overlay">
             <AddressSearch onSelect={onSearchSelect} />
             {#if previewPin}
               <div class="preview-card">
@@ -399,17 +410,6 @@
             {/if}
           </div>
         {/if}
-        <PlacesList
-          {places}
-          {selectedId}
-          {canEdit}
-          onSelectPlace={onSelectPlace}
-          onDeletePlace={onDeletePlace}
-          onUpdatePlace={onUpdatePlace}
-        />
-      </aside>
-
-      <main class="map-area">
         <MapView
           places={mapPlaces}
           {selectedId}
@@ -563,16 +563,27 @@
     overflow: hidden;
     background: #fff;
   }
-  .search-section {
-    padding: 12px;
-    border-bottom: 1px solid #eee;
+  .map-search-overlay {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 600;
+    width: min(380px, calc(100% - 110px));
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .map-search-overlay :global(.search-input-row) {
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
   }
   .preview-card {
-    margin-top: 8px;
     padding: 8px;
-    border: 1px solid #e3e3e3;
+    border: 1px solid #d6d6d6;
     border-radius: 5px;
-    background: #fafbfc;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
     display: flex;
     flex-direction: column;
     gap: 6px;
