@@ -66,9 +66,7 @@ async def post_share(datasette, request, list_id: int):
     parsed: list[tuple[str, str]] = []
     for entry in raw_shares:
         if not isinstance(entry, dict):
-            return Response.json(
-                {"error": "each share must be an object"}, status=400
-            )
+            return Response.json({"error": "each share must be an object"}, status=400)
         actor_value = entry.get("actorID")
         role = entry.get("role")
         if not isinstance(actor_value, str) or not actor_value.strip():
@@ -82,9 +80,7 @@ async def post_share(datasette, request, list_id: int):
             )
         actor_value = actor_value.strip()
         if actor_value == pl.created_by:
-            return Response.json(
-                {"error": "owner cannot appear in shares"}, status=400
-            )
+            return Response.json({"error": "owner cannot appear in shares"}, status=400)
         if actor_value in seen:
             return Response.json(
                 {"error": f"duplicate actor in shares: {actor_value}"}, status=400

@@ -30,13 +30,15 @@ async def test_set_share_state(ds):
 
     resp = await ds.client.post(
         f"/-/places/api/lists/{list_id}/share",
-        content=json.dumps({
-            "visibility": "link-view",
-            "shares": [
-                {"actorID": "bob", "role": "editor"},
-                {"actorID": "carol", "role": "viewer"},
-            ],
-        }),
+        content=json.dumps(
+            {
+                "visibility": "link-view",
+                "shares": [
+                    {"actorID": "bob", "role": "editor"},
+                    {"actorID": "carol", "role": "viewer"},
+                ],
+            }
+        ),
         headers={"content-type": "application/json"},
     )
     assert resp.status_code == 200
@@ -65,13 +67,15 @@ async def test_share_validation_duplicate_actor(ds):
 
     resp = await ds.client.post(
         f"/-/places/api/lists/{list_id}/share",
-        content=json.dumps({
-            "visibility": "private",
-            "shares": [
-                {"actorID": "bob", "role": "editor"},
-                {"actorID": "bob", "role": "viewer"},
-            ],
-        }),
+        content=json.dumps(
+            {
+                "visibility": "private",
+                "shares": [
+                    {"actorID": "bob", "role": "editor"},
+                    {"actorID": "bob", "role": "viewer"},
+                ],
+            }
+        ),
         headers={"content-type": "application/json"},
     )
     assert resp.status_code == 400
@@ -84,10 +88,12 @@ async def test_share_validation_owner_in_shares(ds):
 
     resp = await ds.client.post(
         f"/-/places/api/lists/{list_id}/share",
-        content=json.dumps({
-            "visibility": "private",
-            "shares": [{"actorID": "test-user", "role": "editor"}],
-        }),
+        content=json.dumps(
+            {
+                "visibility": "private",
+                "shares": [{"actorID": "test-user", "role": "editor"}],
+            }
+        ),
         headers={"content-type": "application/json"},
     )
     assert resp.status_code == 400

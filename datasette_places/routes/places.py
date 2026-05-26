@@ -91,9 +91,7 @@ async def api_add_place(datasette, request, list_id: int):
     return Response.json(_place_payload(place), status=201)
 
 
-@router.POST(
-    r"^/-/places/api/lists/(?P<list_id>\d+)/places/(?P<place_id>\d+)/update$"
-)
+@router.POST(r"^/-/places/api/lists/(?P<list_id>\d+)/places/(?P<place_id>\d+)/update$")
 async def api_update_place(datasette, request, list_id: int, place_id: int):
     await ensure_places_edit(datasette, request, list_id)
     db = places_db(datasette)
@@ -133,9 +131,7 @@ async def api_update_place(datasette, request, list_id: int, place_id: int):
     return Response.json(_place_payload(place))
 
 
-@router.POST(
-    r"^/-/places/api/lists/(?P<list_id>\d+)/places/(?P<place_id>\d+)/delete$"
-)
+@router.POST(r"^/-/places/api/lists/(?P<list_id>\d+)/places/(?P<place_id>\d+)/delete$")
 async def api_delete_place(datasette, request, list_id: int, place_id: int):
     await ensure_places_edit(datasette, request, list_id)
     db = places_db(datasette)

@@ -5,8 +5,6 @@ from __future__ import annotations
 import pytest_asyncio
 from datasette.app import Datasette
 
-from datasette_places.db import PlacesDB
-
 
 DEFAULT_ACTOR_ID = "test-user"
 

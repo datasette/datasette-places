@@ -17,14 +17,16 @@ async def test_add_place(ds):
 
     resp = await ds.client.post(
         f"/-/places/api/lists/{list_id}/places",
-        content=json.dumps({
-            "name": "Blue Bottle Coffee",
-            "address": "123 Main St, SF",
-            "latitude": 37.7749,
-            "longitude": -122.4194,
-            "notes": "Great pour-over",
-            "color": "#ef4444",
-        }),
+        content=json.dumps(
+            {
+                "name": "Blue Bottle Coffee",
+                "address": "123 Main St, SF",
+                "latitude": 37.7749,
+                "longitude": -122.4194,
+                "notes": "Great pour-over",
+                "color": "#ef4444",
+            }
+        ),
         headers={"content-type": "application/json"},
     )
     assert resp.status_code == 201
@@ -120,12 +122,14 @@ async def test_add_place_with_metadata(ds):
 
     resp = await ds.client.post(
         f"/-/places/api/lists/{list_id}/places",
-        content=json.dumps({
-            "name": "Tagged",
-            "latitude": 1.0,
-            "longitude": 2.0,
-            "metadata": {"rating": "5", "wifi": "yes"},
-        }),
+        content=json.dumps(
+            {
+                "name": "Tagged",
+                "latitude": 1.0,
+                "longitude": 2.0,
+                "metadata": {"rating": "5", "wifi": "yes"},
+            }
+        ),
         headers={"content-type": "application/json"},
     )
     assert resp.status_code == 201

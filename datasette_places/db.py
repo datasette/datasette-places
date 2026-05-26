@@ -140,9 +140,7 @@ class PlacesDB:
 
         return await self.database.execute_write_fn(read)
 
-    async def update_list_name(
-        self, *, list_id: int, name: str
-    ) -> Optional[PlaceList]:
+    async def update_list_name(self, *, list_id: int, name: str) -> Optional[PlaceList]:
         def write(conn):
             row = conn.execute(
                 """
@@ -255,7 +253,17 @@ class PlacesDB:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING *
                 """,
-                [list_id, name, address, latitude, longitude, notes, color, metadata_json, created_by],
+                [
+                    list_id,
+                    name,
+                    address,
+                    latitude,
+                    longitude,
+                    notes,
+                    color,
+                    metadata_json,
+                    created_by,
+                ],
             )
             # Also bump the parent list's updated_at
             conn.execute(
@@ -345,9 +353,7 @@ class PlacesDB:
             ).fetchone()
             if current is None:
                 return False
-            conn.execute(
-                "DELETE FROM _datasette_places_place WHERE id = ?", [place_id]
-            )
+            conn.execute("DELETE FROM _datasette_places_place WHERE id = ?", [place_id])
             conn.execute(
                 "UPDATE _datasette_places_list SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
                 [current[0]],
