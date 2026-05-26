@@ -122,8 +122,8 @@
   {/if}
 
   {#if editing}
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="edit-form" onclick={(e) => e.stopPropagation()}>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div class="edit-form" role="presentation" onclick={(e) => e.stopPropagation()}>
       <label>
         Color:
         <input type="color" bind:value={editColor} />
@@ -171,8 +171,8 @@
       </div>
     {/if}
     {#if canEdit}
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-      <div class="actions" onclick={(e) => e.stopPropagation()}>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="actions" role="presentation" onclick={(e) => e.stopPropagation()}>
         <button type="button" onclick={startEdit}>Edit</button>
         <button type="button" class="danger" onclick={onDelete}>Delete</button>
       </div>
