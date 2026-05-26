@@ -84,6 +84,7 @@ async def api_get_list(datasette, request, list_id: int):
         {
             "id": pl.id,
             "name": pl.name,
+            "description": pl.description,
             "created_by": pl.created_by,
             "visibility": pl.visibility,
             "state": pl.state,
@@ -111,6 +112,22 @@ async def api_rename_list(datasette, request, list_id: int):
     if pl is None:
         return Response.json({"error": "List not found"}, status=404)
     return Response.json({"id": pl.id, "name": pl.name, "updated_at": pl.updated_at})
+
+
+@router.POST(r"^/-/places/api/lists/(?P<list_id>\d+)/describe$")
+async def api_describe_list(datasette, request, list_id: int):
+    await ensure_places_edit(datasette, request, list_id)
+    db = places_db(datasette)
+    body = await read_json_body(request)
+    # An empty string clears the description; missing key is treated the same.
+    raw = body.get("description")
+    description = raw.strip() if isinstance(raw, str) and raw.strip() else None
+    pl = await db.update_list_description(list_id=list_id, description=description)
+    if pl is None:
+        return Response.json({"error": "List not found"}, status=404)
+    return Response.json(
+        {"id": pl.id, "description": pl.description, "updated_at": pl.updated_at}
+    )
 
 
 async def _ensure_owner(datasette, request, list_id: int):

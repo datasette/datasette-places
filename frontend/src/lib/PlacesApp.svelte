@@ -30,6 +30,7 @@
   type ListDetail = {
     id: number;
     name: string;
+    description: string | null;
     created_by: string | null;
     visibility: string;
     state: string;
@@ -55,9 +56,24 @@
   let editingName = $state(false);
   let editNameValue = $state("");
   let shareOpen = $state(false);
+  let editingDesc = $state(false);
+  let editDescValue = $state("");
+  let geocodingClick = $state(false);
   let mapView: MapView;
 
   let canEdit = $derived(listDetail?.permissions?.canEdit ?? false);
+
+  function relativeTime(iso: string): string {
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return iso;
+    const diff = Date.now() - t;
+    if (diff < 60_000) return "just now";
+    const mins = Math.round(diff / 60_000);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.round(diff / 3_600_000);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.round(diff / 86_400_000)}d ago`;
+  }
 
   async function loadData() {
     loading = true;
@@ -155,15 +171,64 @@
     }
   }
 
-  function onMapClick(lat: number, lon: number) {
-    // If we have edit permissions, set a preview pin at click location
-    if (canEdit) {
-      previewPin = {
-        latitude: lat,
-        longitude: lon,
-        name: `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
-      };
+  async function onMapClick(lat: number, lon: number) {
+    if (!canEdit) return;
+    // Drop the pin immediately with coordinates, then try to resolve a real
+    // address via reverse geocoding and upgrade the label when it arrives.
+    const coordLabel = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    previewPin = { latitude: lat, longitude: lon, name: coordLabel };
+    geocodingClick = true;
+    try {
+      const resp = await fetch(
+        `/-/places/api/reverse?lat=${lat}&lon=${lon}`,
+        { headers: { "Content-Type": "application/json" } }
+      );
+      if (resp.ok) {
+        const data = await resp.json();
+        // Only apply if the user hasn't moved/cancelled the pin meanwhile.
+        if (
+          previewPin &&
+          previewPin.latitude === lat &&
+          previewPin.longitude === lon &&
+          data.display_name
+        ) {
+          previewPin = { ...previewPin, name: data.display_name };
+        }
+      }
+    } catch {
+      // Keep the coordinate label on failure — non-fatal.
     }
+    geocodingClick = false;
+  }
+
+  async function onMovePlace(id: number, lat: number, lon: number) {
+    await onUpdatePlace(id, {
+      latitude: lat,
+      longitude: lon,
+    } as Partial<Place>);
+  }
+
+  async function saveListDescription() {
+    const value = editDescValue.trim();
+    try {
+      const resp = await fetch(`/-/places/api/lists/${listId}/describe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: value }),
+      });
+      if (!resp.ok) throw new Error("Failed to save description");
+      const data = await resp.json();
+      if (listDetail) listDetail = { ...listDetail, description: data.description };
+    } catch {
+      error = "Failed to save description";
+    }
+    editingDesc = false;
+  }
+
+  function startEditDesc() {
+    if (!canEdit) return;
+    editDescValue = listDetail?.description ?? "";
+    editingDesc = true;
   }
 
   function startEditName() {
@@ -197,6 +262,7 @@
       latitude: p.latitude,
       longitude: p.longitude,
       color: p.color || "#3b82f6",
+      shape: p.metadata?.shape || "pin",
     }))
   );
 
@@ -242,6 +308,39 @@
           </button>
         {/if}
       </div>
+
+      {#if editingDesc}
+        <textarea
+          class="desc-input"
+          bind:value={editDescValue}
+          rows="2"
+          placeholder="Add a description for this map..."
+          onkeydown={(e) => {
+            if (e.key === "Escape") editingDesc = false;
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void saveListDescription();
+          }}
+          onblur={() => void saveListDescription()}
+        ></textarea>
+      {:else if listDetail.description}
+        {#if canEdit}
+          <button type="button" class="desc-btn" onclick={startEditDesc} title="Edit description">
+            {listDetail.description}
+          </button>
+        {:else}
+          <p class="desc">{listDetail.description}</p>
+        {/if}
+      {:else if canEdit}
+        <button type="button" class="desc-add" onclick={startEditDesc}>
+          + Add description
+        </button>
+      {/if}
+
+      <div class="meta-line">
+        {places.length}
+        {places.length === 1 ? "place" : "places"}
+        · edited {relativeTime(listDetail.updated_at)}
+      </div>
+
       {#if error}
         <div class="error-inline">{error}</div>
       {/if}
@@ -258,6 +357,7 @@
                   {previewPin.name.length > 40
                     ? previewPin.name.slice(0, 40) + "..."
                     : previewPin.name}
+                  {#if geocodingClick}<em class="lookup">finding address…</em>{/if}
                 </span>
                 <button
                   type="button"
@@ -290,8 +390,10 @@
           places={mapPlaces}
           {selectedId}
           {previewPin}
+          {canEdit}
           onSelectPlace={onSelectPlace}
           onMapClick={onMapClick}
+          onMovePlace={onMovePlace}
         />
       </main>
     </div>
@@ -376,6 +478,52 @@
     margin-top: 6px;
     font-size: 0.9em;
   }
+  .desc, .desc-btn {
+    margin: 4px 0 0;
+    font-size: 0.88em;
+    color: #555;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  .desc-btn {
+    display: block;
+    text-align: left;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: #555;
+    cursor: pointer;
+  }
+  .desc-btn:hover { color: #0b5cad; }
+  .desc-add {
+    margin-top: 4px;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-size: 0.82em;
+    color: #0b5cad;
+    cursor: pointer;
+  }
+  .desc-add:hover { text-decoration: underline; }
+  .desc-input {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    font: inherit;
+    font-size: 0.88em;
+    padding: 4px 6px;
+    border: 1px solid #0b5cad;
+    border-radius: 3px;
+    resize: vertical;
+  }
+  .meta-line {
+    margin-top: 4px;
+    font-size: 0.78em;
+    color: #888;
+  }
 
   .app-body {
     display: flex;
@@ -411,6 +559,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .lookup { color: #999; font-size: 0.9em; }
   .btn-save, .btn-cancel {
     padding: 4px 12px;
     border: 1px solid #ccc;

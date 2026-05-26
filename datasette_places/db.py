@@ -20,6 +20,7 @@ class PlaceList:
     updated_at: str
     visibility: str
     state: str
+    description: Optional[str] = None
 
 
 @dataclass
@@ -48,6 +49,8 @@ class Share:
 
 
 def _row_to_list(row) -> PlaceList:
+    # `description` (row[7]) was added in migration m002; guard against rows
+    # selected before the column exists.
     return PlaceList(
         id=row[0],
         name=row[1],
@@ -56,6 +59,7 @@ def _row_to_list(row) -> PlaceList:
         updated_at=row[4],
         visibility=row[5],
         state=row[6],
+        description=row[7] if len(row) > 7 else None,
     )
 
 
@@ -148,6 +152,24 @@ class PlacesDB:
                 RETURNING *
                 """,
                 [name, list_id],
+            ).fetchone()
+            return _row_to_list(row) if row else None
+
+        return await self.database.execute_write_fn(write)
+
+    async def update_list_description(
+        self, *, list_id: int, description: Optional[str]
+    ) -> Optional[PlaceList]:
+        def write(conn):
+            row = conn.execute(
+                """
+                UPDATE _datasette_places_list
+                SET description = ?,
+                    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+                WHERE id = ?
+                RETURNING *
+                """,
+                [description, list_id],
             ).fetchone()
             return _row_to_list(row) if row else None
 

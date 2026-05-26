@@ -60,3 +60,9 @@ def m001_initial(db: Database):
             ON _datasette_places_share(actor_id);
         """
     )
+
+
+@migrations()
+def m002_list_description(db: Database):
+    # A free-text description shown under the list title.
+    db.execute("ALTER TABLE _datasette_places_list ADD COLUMN description TEXT")

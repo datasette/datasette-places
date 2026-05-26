@@ -86,6 +86,41 @@ async def test_rename_list(ds):
 
 
 @pytest.mark.asyncio
+async def test_describe_list(ds):
+    resp = await ds.client.post(
+        "/-/places/api/lists",
+        content=json.dumps({"name": "Shipwrecks"}),
+        headers={"content-type": "application/json"},
+    )
+    list_id = resp.json()["id"]
+
+    # New lists have no description.
+    resp = await ds.client.get(f"/-/places/api/lists/{list_id}")
+    assert resp.json()["description"] is None
+
+    # Set a description.
+    resp = await ds.client.post(
+        f"/-/places/api/lists/{list_id}/describe",
+        content=json.dumps({"description": "  Wrecks visible from space  "}),
+        headers={"content-type": "application/json"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["description"] == "Wrecks visible from space"
+
+    resp = await ds.client.get(f"/-/places/api/lists/{list_id}")
+    assert resp.json()["description"] == "Wrecks visible from space"
+
+    # Empty string clears it.
+    resp = await ds.client.post(
+        f"/-/places/api/lists/{list_id}/describe",
+        content=json.dumps({"description": "   "}),
+        headers={"content-type": "application/json"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["description"] is None
+
+
+@pytest.mark.asyncio
 async def test_trash_and_restore(ds):
     resp = await ds.client.post(
         "/-/places/api/lists",
