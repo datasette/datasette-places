@@ -59,7 +59,6 @@
   let editingDesc = $state(false);
   let editDescValue = $state("");
   let geocodingClick = $state(false);
-  let mapView: MapView;
 
   let canEdit = $derived(listDetail?.permissions?.canEdit ?? false);
 
@@ -386,7 +385,6 @@
 
       <main class="map-area">
         <MapView
-          bind:this={mapView}
           places={mapPlaces}
           {selectedId}
           {previewPin}
