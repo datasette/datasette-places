@@ -207,7 +207,15 @@ async def places_list_page(datasette, request, list_id: int):
             {
                 "page_title": pl.name or f"Places {list_id}",
                 "entrypoint": "src/pages/list/main.ts",
-                "page_data": {"list_id": list_id},
+                # actor is surfaced so the embedded <datasette-share-dialog> can
+                # mark the current user's row "(you)". csrftoken is optional
+                # under datasette 1.0a30 (same-origin fetches need none) but is
+                # forwarded for forward/back-compat with older asgi-csrf builds.
+                "page_data": {
+                    "list_id": list_id,
+                    "actor": request.actor,
+                    "csrftoken": request.scope.get("csrftoken", lambda: "")(),
+                },
             },
             request=request,
         )

@@ -4,9 +4,17 @@ import "../../app.css";
 import "leaflet/dist/leaflet.css";
 import { loadPageData } from "../../lib/pageData";
 
-const pageData = loadPageData<{ list_id: number }>();
+const pageData = loadPageData<{
+  list_id: number;
+  actor: { id: string } | null;
+  csrftoken: string;
+}>();
 
 mount(PlacesApp, {
   target: document.getElementById("app-root")!,
-  props: { listId: pageData.list_id },
+  props: {
+    listId: pageData.list_id,
+    actor: pageData.actor ?? null,
+    csrftoken: pageData.csrftoken ?? "",
+  },
 });

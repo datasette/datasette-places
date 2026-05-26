@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 
 from datasette import hookimpl, Response
@@ -11,6 +12,25 @@ from .permissions import (  # noqa: F401
     PLACES_LIST_RESOURCE_TYPE,
 )
 from . import routes  # noqa: F401 — triggers decorator registration
+
+
+# The list page is the only places page that hosts <datasette-share-dialog>, so
+# the share bundle is included there (opt-in) rather than site-wide. Matches
+# ``/-/places/list/<id>`` exactly — not the index or any API route.
+_LIST_PAGE_RE = re.compile(r"^/-/places/list/\d+$")
+
+
+def _is_list_page(request) -> bool:
+    return bool(request and _LIST_PAGE_RE.match(request.path or ""))
+
+
+# datasette-share is an optional sibling plugin (local editable dev dep). When
+# it isn't installed the asset helper is unavailable, so the list page simply
+# renders without the share dialog rather than erroring.
+try:
+    from datasette_share import datasette_share_assets as _share_assets
+except ImportError:  # pragma: no cover
+    _share_assets = None
 
 
 def _method_dispatch_routes(raw_routes):
@@ -72,6 +92,22 @@ def extra_template_vars(datasette):
             plugin_package="datasette_places",
         ),
     }
+
+
+@hookimpl
+def extra_js_urls(datasette, request):
+    """Include the <datasette-share-dialog> JS bundle on the list page only."""
+    if _share_assets is None or not _is_list_page(request):
+        return []
+    return _share_assets(datasette)["js"]
+
+
+@hookimpl
+def extra_css_urls(datasette, request):
+    """Include the <datasette-share-dialog> CSS on the list page only."""
+    if _share_assets is None or not _is_list_page(request):
+        return []
+    return _share_assets(datasette)["css"]
 
 
 @hookimpl

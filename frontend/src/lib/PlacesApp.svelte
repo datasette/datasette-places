@@ -3,7 +3,13 @@
   import MapView from "./MapView.svelte";
   import AddressSearch from "./AddressSearch.svelte";
   import PlacesList from "./PlacesList.svelte";
-  import ShareDialog from "./ShareDialog.svelte";
+  // The <datasette-share-dialog> custom element is registered by the
+  // datasette-share JS bundle, which places' extra_js_urls hook includes on
+  // the list page — no component import needed here.
+
+  // acl resource identity for a place list: type "places-list", a parent-only
+  // resource whose parent is the list id (child omitted).
+  const SHARE_RESOURCE_TYPE = "places-list";
 
   type Place = {
     id: number;
@@ -44,7 +50,15 @@
     };
   };
 
-  let { listId }: { listId: number } = $props();
+  let {
+    listId,
+    actor = null,
+    csrftoken = "",
+  }: {
+    listId: number;
+    actor?: { id: string } | null;
+    csrftoken?: string;
+  } = $props();
 
   let listDetail = $state<ListDetail | null>(null);
   let places = $state<Place[]>([]);
@@ -68,6 +82,15 @@
   }
 
   let canEdit = $derived(listDetail?.permissions?.canEdit ?? false);
+  // Share is gated on the acl manage capability (the owner gets it via the
+  // seeded Manager grant) rather than ownership of the row.
+  let canManage = $derived(listDetail?.permissions?.canManage ?? false);
+  // actor-json the dialog reads to mark the current user's row "(you)".
+  let actorJson = $derived(actor ? JSON.stringify(actor) : "");
+
+  function closeShare() {
+    shareOpen = false;
+  }
 
   function relativeTime(iso: string): string {
     const t = Date.parse(iso);
@@ -365,7 +388,7 @@
               <h1>{listDetail.name}</h1>
             {/if}
           {/if}
-          {#if listDetail.permissions.isOwner}
+          {#if canManage}
             <button
               type="button"
               class="share-btn"
@@ -422,11 +445,44 @@
         onUpdatePlace={onUpdatePlace}
       />
     </aside>
-    <ShareDialog
-      {listId}
-      open={shareOpen}
-      onClose={() => { shareOpen = false; }}
-    />
+    {#if shareOpen}
+      <!-- The <datasette-share-dialog> custom element renders an inline panel
+           (people-with-access + general access + add-box) and talks to the acl
+           JSON API directly. places wraps it in a modal so the Share button →
+           dialog UX is preserved. places is parent-only: parent = list id, no
+           child. -->
+      <div
+        class="share-modal-backdrop"
+        role="presentation"
+        onclick={closeShare}
+        onkeydown={(e) => {
+          if (e.key === "Escape") closeShare();
+        }}
+      >
+        <div
+          class="share-modal"
+          role="dialog"
+          aria-label="Share dialog"
+          tabindex="-1"
+          onclick={(e) => e.stopPropagation()}
+          onkeydown={(e) => e.stopPropagation()}
+        >
+          <datasette-share-dialog
+            resource-type={SHARE_RESOURCE_TYPE}
+            parent={String(listId)}
+            resource-label={listDetail.name ?? ""}
+            actor-json={actorJson}
+            csrftoken={csrftoken}
+            features="people,groups,agents,public"
+          ></datasette-share-dialog>
+          <div class="share-modal-footer">
+            <button type="button" class="share-modal-close" onclick={closeShare}>
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -509,6 +565,47 @@
     cursor: pointer;
   }
   .share-btn:hover { background: #f0f4f8; }
+
+  /* Modal wrapper around the <datasette-share-dialog> custom element. The
+     element renders the inline panel; places supplies the backdrop + box so
+     the Share button keeps its modal UX. */
+  .share-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .share-modal {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px 18px;
+    width: 520px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  }
+  .share-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+  .share-modal-close {
+    padding: 6px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    background: #0b5cad;
+    color: #fff;
+    border: 1px solid #0b5cad;
+  }
+  .share-modal-close:hover {
+    background: #094a8b;
+    border-color: #094a8b;
+  }
   .error-inline {
     background: #ffd6d6;
     color: #5a0000;

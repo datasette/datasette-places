@@ -39,15 +39,6 @@ class Place:
     updated_at: str
 
 
-@dataclass
-class Share:
-    list_id: int
-    actor_id: str
-    role: str
-    granted_by: Optional[str]
-    granted_at: str
-
-
 def _row_to_list(row) -> PlaceList:
     # `description` (row[7]) was added in migration m002; guard against rows
     # selected before the column exists.
@@ -77,16 +68,6 @@ def _row_to_place(row) -> Place:
         created_by=row[9],
         created_at=row[10],
         updated_at=row[11],
-    )
-
-
-def _row_to_share(row) -> Share:
-    return Share(
-        list_id=row[0],
-        actor_id=row[1],
-        role=row[2],
-        granted_by=row[3],
-        granted_at=row[4],
     )
 
 
@@ -361,41 +342,3 @@ class PlacesDB:
             return True
 
         return await self.database.execute_write_fn(write)
-
-    # ------------------------------------------------------------------
-    # Shares
-    # ------------------------------------------------------------------
-
-    async def select_shares(self, *, list_id: int) -> list[Share]:
-        def read(conn):
-            rows = conn.execute(
-                "SELECT * FROM _datasette_places_share WHERE list_id = ? ORDER BY granted_at ASC",
-                [list_id],
-            ).fetchall()
-            return [_row_to_share(r) for r in rows]
-
-        return await self.database.execute_write_fn(read)
-
-    async def replace_shares(
-        self,
-        *,
-        list_id: int,
-        visibility: str,
-        shares: list[tuple[str, str]],
-        granted_by: Optional[str],
-    ) -> None:
-        def write(conn):
-            conn.execute(
-                "UPDATE _datasette_places_list SET visibility = ? WHERE id = ?",
-                [visibility, list_id],
-            )
-            conn.execute(
-                "DELETE FROM _datasette_places_share WHERE list_id = ?", [list_id]
-            )
-            for actor_id, role in shares:
-                conn.execute(
-                    "INSERT INTO _datasette_places_share (list_id, actor_id, role, granted_by) VALUES (?, ?, ?, ?)",
-                    [list_id, actor_id, role, granted_by],
-                )
-
-        await self.database.execute_write_fn(write)
