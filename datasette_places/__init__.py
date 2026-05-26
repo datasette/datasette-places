@@ -213,3 +213,33 @@ async def startup(datasette):
     # _datasette_places_share) and is guarded by its own marker so it's a no-op
     # on every startup after the first. Safe when acl isn't installed.
     await migrate_shares_to_acl(datasette)
+
+
+# Bootstrap `bi-geo-alt-fill` location marker — used as the sidebar icon.
+PLACES_ICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" '
+    'fill="currentColor" class="bi bi-geo-alt-fill" viewBox="0 0 16 16">'
+    '<path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 '
+    '1 1 0-6 3 3 0 0 1 0 6"/></svg>'
+)
+
+
+# Optional integration with `datasette-sidebar` — if the package is installed,
+# register a Places entry. The try/except keeps the plugin import-clean when
+# datasette-sidebar isn't present.
+try:
+    from datasette_sidebar.hookspecs import SidebarApp  # type: ignore[import-not-found]
+
+    @hookimpl
+    def datasette_sidebar_apps(datasette):
+        return [
+            SidebarApp(
+                label="Places",
+                description="Saved lists of places on a map",
+                href=lambda _db: "/-/places/",
+                icon=PLACES_ICON_SVG,
+                color="#276890",
+            )
+        ]
+except ImportError:
+    pass
