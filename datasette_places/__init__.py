@@ -168,7 +168,12 @@ def menu_links(datasette, actor, request=None):
 
 @hookimpl
 async def startup(datasette):
-    from .migrations import ensure_migrations
+    from .migrations import ensure_migrations, migrate_shares_to_acl
 
     internal = datasette.get_internal_database()
     await ensure_migrations(internal)
+    # One-time backfill of legacy visibility/share rows into acl grants. Runs
+    # after the schema migrations (it reads _datasette_places_list /
+    # _datasette_places_share) and is guarded by its own marker so it's a no-op
+    # on every startup after the first. Safe when acl isn't installed.
+    await migrate_shares_to_acl(datasette)
