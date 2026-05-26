@@ -40,7 +40,6 @@ async def api_list_lists(datasette, request):
                 "place_count": counts.get(r.id, 0),
                 "created_by": r.created_by,
                 "updated_at": r.updated_at,
-                "visibility": r.visibility,
                 "state": r.state,
                 "is_owner": r.created_by is not None and r.created_by == me,
             }
@@ -92,7 +91,6 @@ async def api_get_list(datasette, request, list_id: int):
             "name": pl.name,
             "description": pl.description,
             "created_by": pl.created_by,
-            "visibility": pl.visibility,
             "state": pl.state,
             "place_count": count,
             "updated_at": pl.updated_at,

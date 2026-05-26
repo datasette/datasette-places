@@ -332,3 +332,56 @@ def m001_initial(db: Database):
 def m002_list_description(db: Database):
     # A free-text description shown under the list title.
     db.execute("ALTER TABLE _datasette_places_list ADD COLUMN description TEXT")
+
+
+@migrations()
+def m003_drop_legacy_share_model(db: Database):
+    # Sharing is now owned by datasette-acl (resource type ``places-list``).
+    # The owner/visibility/share data was backfilled into acl grants by the
+    # one-time ``migrate_shares_to_acl`` startup routine (see above); this step
+    # retires the legacy storage that fed it:
+    #
+    #   * ``_datasette_places_share``           — explicit per-actor grants
+    #   * ``_datasette_places_list.visibility`` — the link-* general-access enum
+    #
+    # IMPORTANT: this runs in ``ensure_migrations`` BEFORE the startup data
+    # migration's read. On any DB that already holds legacy data the backfill
+    # ran on a prior boot (its marker is set), so dropping here loses nothing;
+    # on a fresh DB there was never any legacy data. ``migrate_shares_to_acl``
+    # tolerates the missing column/table (it treats "no legacy schema" as
+    # "nothing to migrate").
+    #
+    # SQLite only learned ``ALTER TABLE ... DROP COLUMN`` in 3.35; sqlite-migrate
+    # may run against older engines, so drop ``visibility`` via the portable
+    # 12-step table rebuild rather than DROP COLUMN. The rebuilt table keeps the
+    # exact column set + constraints + indexes minus ``visibility``.
+    db.executescript(
+        """
+        DROP TABLE IF EXISTS _datasette_places_share;
+
+        CREATE TABLE _datasette_places_list_new (
+            id          INTEGER PRIMARY KEY NOT NULL,
+            name        TEXT NOT NULL,
+            created_by  TEXT,
+            created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            state       TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('active','trashed')),
+            description TEXT
+        );
+
+        INSERT INTO _datasette_places_list_new (
+            id, name, created_by, created_at, updated_at, state, description
+        )
+        SELECT
+            id, name, created_by, created_at, updated_at, state, description
+        FROM _datasette_places_list;
+
+        DROP TABLE _datasette_places_list;
+        ALTER TABLE _datasette_places_list_new RENAME TO _datasette_places_list;
+
+        CREATE INDEX IF NOT EXISTS idx_places_list_owner
+            ON _datasette_places_list(created_by);
+        CREATE INDEX IF NOT EXISTS idx_places_list_state
+            ON _datasette_places_list(state);
+        """
+    )

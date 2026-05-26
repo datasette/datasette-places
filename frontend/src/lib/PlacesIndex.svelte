@@ -7,7 +7,6 @@
     place_count: number;
     created_by: string | null;
     updated_at: string;
-    visibility: string;
     state: string;
     is_owner: boolean;
   };
@@ -188,9 +187,6 @@
           <tr>
             <td>
               <a href="/-/places/list/{row.id}">{row.name}</a>
-              {#if row.visibility !== "private"}
-                <span class="badge">{row.visibility}</span>
-              {/if}
             </td>
             <td>{row.place_count}</td>
             <td title={row.updated_at}>{relativeTime(row.updated_at)}</td>
@@ -308,14 +304,4 @@
   .action-btn:hover { background: #f5f5f5; }
   .action-btn.danger { color: #8a1a1a; border-color: #daa; }
   .action-btn.danger:hover { background: #fbecec; }
-  .badge {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 7px;
-    font-size: 11px;
-    border-radius: 9px;
-    background: #eef2f7;
-    color: #4a5568;
-    border: 1px solid #d0d7e0;
-  }
 </style>

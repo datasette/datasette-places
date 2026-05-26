@@ -38,7 +38,6 @@
     name: string;
     description: string | null;
     created_by: string | null;
-    visibility: string;
     state: string;
     place_count: number;
     updated_at: string;
