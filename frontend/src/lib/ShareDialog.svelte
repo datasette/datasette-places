@@ -19,7 +19,7 @@
     onClose: () => void;
   } = $props();
 
-  let state = $state<ShareState | null>(null);
+  let shareState = $state<ShareState | null>(null);
   let loading = $state(false);
   let saving = $state(false);
   let error = $state<string | null>(null);
@@ -38,9 +38,9 @@
         headers: { "Content-Type": "application/json" },
       });
       if (!resp.ok) throw new Error("Failed to load");
-      state = await resp.json();
-      draftVisibility = state!.visibility;
-      draftShares = state!.shares.map((s) => ({ ...s }));
+      shareState = await resp.json();
+      draftVisibility = shareState!.visibility;
+      draftShares = shareState!.shares.map((s) => ({ ...s }));
     } catch {
       error = "Failed to load share settings";
     }
@@ -50,7 +50,7 @@
   function addShare() {
     const id = newActorId.trim();
     if (!id) return;
-    if (state && id === state.owner) {
+    if (shareState && id === shareState.owner) {
       error = "Cannot add the owner as a share";
       return;
     }
@@ -74,10 +74,10 @@
   }
 
   let isDirty = $derived(() => {
-    if (!state) return false;
-    if (draftVisibility !== state.visibility) return true;
-    if (draftShares.length !== state.shares.length) return true;
-    const orig = state.shares.map((s) => `${s.actorID}:${s.role}`).sort().join(",");
+    if (!shareState) return false;
+    if (draftVisibility !== shareState.visibility) return true;
+    if (draftShares.length !== shareState.shares.length) return true;
+    const orig = shareState.shares.map((s) => `${s.actorID}:${s.role}`).sort().join(",");
     const draft = draftShares.map((s) => `${s.actorID}:${s.role}`).sort().join(",");
     return orig !== draft;
   });
@@ -102,9 +102,9 @@
         const data = await resp.json();
         throw new Error(data.error || "Failed to save");
       }
-      state = await resp.json();
-      draftVisibility = state!.visibility;
-      draftShares = state!.shares.map((s) => ({ ...s }));
+      shareState = await resp.json();
+      draftVisibility = shareState!.visibility;
+      draftShares = shareState!.shares.map((s) => ({ ...s }));
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to save";
     }
@@ -116,18 +116,20 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") onClose();
+    if (open && e.key === "Escape") onClose();
   }
 
   $effect(() => {
-    if (open && !state && !loading) void load();
+    if (open && !shareState && !loading) void load();
   });
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
+
 {#if open}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="backdrop" onclick={handleBackdrop}>
-    <div class="dialog" role="dialog" aria-modal="true" onkeydown={handleKeydown}>
+  <div class="backdrop" role="presentation" onclick={handleBackdrop}>
+    <div class="dialog" role="dialog" aria-modal="true" tabindex="-1">
       <header>
         <h2>Share settings</h2>
         <button type="button" class="close-btn" onclick={onClose}>&times;</button>
@@ -135,7 +137,7 @@
 
       {#if loading}
         <p class="loading">Loading...</p>
-      {:else if state}
+      {:else if shareState}
         {#if error}
           <div class="error">{error}</div>
         {/if}
@@ -147,7 +149,7 @@
               type="radio"
               bind:group={draftVisibility}
               value="private"
-              disabled={!state.canManage}
+              disabled={!shareState.canManage}
             />
             Restricted (only shared people)
           </label>
@@ -156,7 +158,7 @@
               type="radio"
               bind:group={draftVisibility}
               value="link-view"
-              disabled={!state.canManage}
+              disabled={!shareState.canManage}
             />
             Anyone with access can view
           </label>
@@ -165,7 +167,7 @@
               type="radio"
               bind:group={draftVisibility}
               value="link-edit"
-              disabled={!state.canManage}
+              disabled={!shareState.canManage}
             />
             Anyone with access can edit
           </label>
@@ -173,9 +175,9 @@
 
         <section>
           <h3>People with access</h3>
-          {#if state.owner}
+          {#if shareState.owner}
             <div class="share-row">
-              <span class="actor">{state.owner}</span>
+              <span class="actor">{shareState.owner}</span>
               <span class="role-tag">Owner</span>
             </div>
           {/if}
@@ -183,7 +185,7 @@
           {#each draftShares as share}
             <div class="share-row">
               <span class="actor">{share.actorID}</span>
-              {#if state.canManage}
+              {#if shareState.canManage}
                 <select
                   value={share.role}
                   onchange={(e) => changeRole(share.actorID, (e.target as HTMLSelectElement).value as Role)}
@@ -202,7 +204,7 @@
             </div>
           {/each}
 
-          {#if state.canManage}
+          {#if shareState.canManage}
             <div class="add-share">
               <input
                 type="text"
@@ -219,7 +221,7 @@
           {/if}
         </section>
 
-        {#if state.canManage}
+        {#if shareState.canManage}
           <footer>
             <button
               type="button"
