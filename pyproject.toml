@@ -32,7 +32,7 @@ dev = [
 # <datasette-acl-share-dialog> bundle is served via datasette-acl-share's asset helper.
 [tool.uv.sources]
 datasette-acl = { path = "../datasette-acl", editable = true }
-datasette-acl-share = { path = "../datasette-share", editable = true }
+datasette-acl-share = { path = "../datasette-acl-share", editable = true }
 
 [build-system]
 requires = ["setuptools"]
