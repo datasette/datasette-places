@@ -3,8 +3,8 @@
   import MapView from "./MapView.svelte";
   import AddressSearch from "./AddressSearch.svelte";
   import PlacesList from "./PlacesList.svelte";
-  // The <datasette-share-dialog> custom element is registered by the
-  // datasette-share JS bundle, which places' extra_js_urls hook includes on
+  // The <datasette-acl-share-dialog> custom element is registered by the
+  // datasette-acl-share JS bundle, which places' extra_js_urls hook includes on
   // the list page — no component import needed here.
 
   // acl resource identity for a place list: type "places-list", a parent-only
@@ -445,7 +445,7 @@
       />
     </aside>
     {#if shareOpen}
-      <!-- The <datasette-share-dialog> custom element renders an inline panel
+      <!-- The <datasette-acl-share-dialog> custom element renders an inline panel
            (people-with-access + general access + add-box) and talks to the acl
            JSON API directly. places wraps it in a modal so the Share button →
            dialog UX is preserved. places is parent-only: parent = list id, no
@@ -466,14 +466,14 @@
           onclick={(e) => e.stopPropagation()}
           onkeydown={(e) => e.stopPropagation()}
         >
-          <datasette-share-dialog
+          <datasette-acl-share-dialog
             resource-type={SHARE_RESOURCE_TYPE}
             parent={String(listId)}
             resource-label={listDetail.name ?? ""}
             actor-json={actorJson}
             csrftoken={csrftoken}
             features="people,groups,agents,public"
-          ></datasette-share-dialog>
+          ></datasette-acl-share-dialog>
           <div class="share-modal-footer">
             <button type="button" class="share-modal-close" onclick={closeShare}>
               Done
@@ -565,7 +565,7 @@
   }
   .share-btn:hover { background: #f0f4f8; }
 
-  /* Modal wrapper around the <datasette-share-dialog> custom element. The
+  /* Modal wrapper around the <datasette-acl-share-dialog> custom element. The
      element renders the inline panel; places supplies the backdrop + box so
      the Share button keeps its modal UX. */
   .share-modal-backdrop {

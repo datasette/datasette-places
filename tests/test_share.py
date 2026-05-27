@@ -1,6 +1,6 @@
-"""Tests for places sharing after the datasette-share migration (phase-06/03).
+"""Tests for places sharing after the datasette-acl-share migration (phase-06/03).
 
-Sharing now lives in datasette-acl: the embedded ``<datasette-share-dialog>``
+Sharing now lives in datasette-acl: the embedded ``<datasette-acl-share-dialog>``
 custom element grants / updates / revokes acl grants directly against the acl
 JSON API, and places no longer ships its own ``GET/POST /share`` routes, share
 table, or ShareDialog. These tests cover that the legacy routes are gone, the
