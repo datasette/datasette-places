@@ -28,6 +28,9 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "ruff>=0.15.0",
+    # solite provides the `codegen` CLI used by `just codegen-queries` to
+    # compile datasette_places/sql/queries.sql into typed Python helpers.
+    "solite>=0.0.1a36",
 ]
 
 [build-system]

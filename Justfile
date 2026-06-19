@@ -46,6 +46,27 @@ types-routes:
 types:
     just types-routes
 
+# --- Codegen: SQL queries ---
+
+# Build schema.db from migrations.py — the post-migration schema that
+# `solite codegen` validates queries against (and that resolves the
+# `-- schema: ../../schema.db` directive for editor tooling). Gitignored.
+schema:
+    rm -f schema.db
+    uv run --prerelease=allow sqlite-utils migrate schema.db datasette_places/migrations.py >/dev/null
+
+# Regenerate datasette_places/sql/queries_generated.py from queries.sql.
+# migrations.py is the single source of truth for schema; `solite codegen`
+# resolves column types + nullability against schema.db, the IR is teed to
+# queries.sql.json (gitignored intermediate), gen_queries.py turns it into
+# typed helpers, and `ruff format -` tidies the result over the pipe.
+codegen-queries: schema
+    uv run solite codegen --schema schema.db datasette_places/sql/queries.sql \
+        | tee datasette_places/sql/queries.sql.json \
+        | uv run python tools/gen_queries.py /dev/stdin \
+        | uv run ruff format - \
+        > datasette_places/sql/queries_generated.py
+
 # --- Tests ---
 
 test *flags:

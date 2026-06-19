@@ -2,71 +2,23 @@
 
 All operations run on Datasette's internal database via execute_write_fn
 for transaction safety.
+
+The SQL itself lives in ``sql/queries.sql`` and is compiled into
+``sql/queries_generated.py`` by ``just codegen-queries``. PlacesDB is orchestration
+only — multi-statement operations (a place insert/update/delete bumping the
+parent list's ``updated_at``) chain the generated helpers inside a single
+``execute_write_fn`` closure so the transaction stays atomic.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from typing import Optional
 
+from .sql import queries_generated as _queries
+from .sql.queries_generated import Place, PlaceList  # re-exported for callers
 
-@dataclass
-class PlaceList:
-    id: int
-    name: str
-    created_by: Optional[str]
-    created_at: str
-    updated_at: str
-    state: str
-    description: Optional[str] = None
-
-
-@dataclass
-class Place:
-    id: int
-    list_id: int
-    name: str
-    address: Optional[str]
-    latitude: float
-    longitude: float
-    notes: Optional[str]
-    color: Optional[str]
-    metadata_json: Optional[str]
-    created_by: Optional[str]
-    created_at: str
-    updated_at: str
-
-
-def _row_to_list(row) -> PlaceList:
-    # Column order (see migrations.m001_initial):
-    #   id, name, created_by, created_at, updated_at, state, description
-    return PlaceList(
-        id=row[0],
-        name=row[1],
-        created_by=row[2],
-        created_at=row[3],
-        updated_at=row[4],
-        state=row[5],
-        description=row[6],
-    )
-
-
-def _row_to_place(row) -> Place:
-    return Place(
-        id=row[0],
-        list_id=row[1],
-        name=row[2],
-        address=row[3],
-        latitude=row[4],
-        longitude=row[5],
-        notes=row[6],
-        color=row[7],
-        metadata_json=row[8],
-        created_by=row[9],
-        created_at=row[10],
-        updated_at=row[11],
-    )
+__all__ = ["PlacesDB", "Place", "PlaceList"]
 
 
 class PlacesDB:
@@ -83,20 +35,15 @@ class PlacesDB:
         self, *, name: str, created_by: Optional[str] = None
     ) -> PlaceList:
         def write(conn):
-            cursor = conn.execute(
-                "INSERT INTO _datasette_places_list (name, created_by) VALUES (?, ?) RETURNING *",
-                [name, created_by],
-            )
-            return _row_to_list(cursor.fetchone())
+            return _queries.insert_list(conn, name=name, created_by=created_by)
 
-        return await self.database.execute_write_fn(write)
+        pl = await self.database.execute_write_fn(write)
+        assert pl is not None
+        return pl
 
     async def select_list_by_id(self, list_id: int) -> Optional[PlaceList]:
         def read(conn):
-            row = conn.execute(
-                "SELECT * FROM _datasette_places_list WHERE id = ?", [list_id]
-            ).fetchone()
-            return _row_to_list(row) if row else None
+            return _queries.select_list_by_id(conn, list_id=list_id)
 
         return await self.database.execute_write_fn(read)
 
@@ -106,31 +53,15 @@ class PlacesDB:
         ids_json = json.dumps(list_ids)
 
         def read(conn):
-            rows = conn.execute(
-                """
-                SELECT l.* FROM _datasette_places_list l
-                JOIN json_each(?) je ON je.value = l.id
-                WHERE l.state = ?
-                ORDER BY l.updated_at DESC
-                """,
-                [ids_json, state],
-            ).fetchall()
-            return [_row_to_list(r) for r in rows]
+            return _queries.list_lists_by_ids_and_state(
+                conn, ids_json=ids_json, state=state
+            )
 
         return await self.database.execute_write_fn(read)
 
     async def update_list_name(self, *, list_id: int, name: str) -> Optional[PlaceList]:
         def write(conn):
-            row = conn.execute(
-                """
-                UPDATE _datasette_places_list
-                SET name = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-                WHERE id = ?
-                RETURNING *
-                """,
-                [name, list_id],
-            ).fetchone()
-            return _row_to_list(row) if row else None
+            return _queries.update_list_name(conn, name=name, list_id=list_id)
 
         return await self.database.execute_write_fn(write)
 
@@ -138,55 +69,27 @@ class PlacesDB:
         self, *, list_id: int, description: Optional[str]
     ) -> Optional[PlaceList]:
         def write(conn):
-            row = conn.execute(
-                """
-                UPDATE _datasette_places_list
-                SET description = ?,
-                    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-                WHERE id = ?
-                RETURNING *
-                """,
-                [description, list_id],
-            ).fetchone()
-            return _row_to_list(row) if row else None
+            return _queries.update_list_description(
+                conn, description=description, list_id=list_id
+            )
 
         return await self.database.execute_write_fn(write)
 
     async def trash_list(self, *, list_id: int) -> None:
         def write(conn):
-            conn.execute(
-                """
-                UPDATE _datasette_places_list
-                SET state = 'trashed',
-                    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-                WHERE id = ?
-                """,
-                [list_id],
-            )
+            _queries.trash_list(conn, list_id=list_id)
 
         await self.database.execute_write_fn(write)
 
     async def restore_list(self, *, list_id: int) -> None:
         def write(conn):
-            conn.execute(
-                """
-                UPDATE _datasette_places_list
-                SET state = 'active',
-                    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-                WHERE id = ?
-                """,
-                [list_id],
-            )
+            _queries.restore_list(conn, list_id=list_id)
 
         await self.database.execute_write_fn(write)
 
     async def place_count_for_list(self, *, list_id: int) -> int:
         def read(conn):
-            row = conn.execute(
-                "SELECT COUNT(*) FROM _datasette_places_place WHERE list_id = ?",
-                [list_id],
-            ).fetchone()
-            return row[0]
+            return _queries.place_count_for_list(conn, list_id=list_id)
 
         return await self.database.execute_write_fn(read)
 
@@ -194,16 +97,8 @@ class PlacesDB:
         ids_json = json.dumps(list_ids)
 
         def read(conn):
-            rows = conn.execute(
-                """
-                SELECT list_id, COUNT(*) as cnt
-                FROM _datasette_places_place
-                WHERE list_id IN (SELECT value FROM json_each(?))
-                GROUP BY list_id
-                """,
-                [ids_json],
-            ).fetchall()
-            return {row[0]: row[1] for row in rows}
+            rows = _queries.place_counts_by_list_ids(conn, ids_json=ids_json)
+            return {row.list_id: row.cnt for row in rows}
 
         return await self.database.execute_write_fn(read)
 
@@ -225,50 +120,35 @@ class PlacesDB:
         created_by: Optional[str] = None,
     ) -> Place:
         def write(conn):
-            cursor = conn.execute(
-                """
-                INSERT INTO _datasette_places_place
-                    (list_id, name, address, latitude, longitude, notes, color, metadata_json, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                RETURNING *
-                """,
-                [
-                    list_id,
-                    name,
-                    address,
-                    latitude,
-                    longitude,
-                    notes,
-                    color,
-                    metadata_json,
-                    created_by,
-                ],
+            place = _queries.insert_place(
+                conn,
+                list_id=list_id,
+                name=name,
+                address=address,
+                latitude=latitude,
+                longitude=longitude,
+                notes=notes,
+                color=color,
+                metadata_json=metadata_json,
+                created_by=created_by,
             )
-            # Also bump the parent list's updated_at
-            conn.execute(
-                "UPDATE _datasette_places_list SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
-                [list_id],
-            )
-            return _row_to_place(cursor.fetchone())
+            # Also bump the parent list's updated_at.
+            _queries.bump_list_updated_at(conn, list_id=list_id)
+            return place
 
-        return await self.database.execute_write_fn(write)
+        place = await self.database.execute_write_fn(write)
+        assert place is not None
+        return place
 
     async def select_places_for_list(self, *, list_id: int) -> list[Place]:
         def read(conn):
-            rows = conn.execute(
-                "SELECT * FROM _datasette_places_place WHERE list_id = ? ORDER BY created_at ASC",
-                [list_id],
-            ).fetchall()
-            return [_row_to_place(r) for r in rows]
+            return _queries.select_places_for_list(conn, list_id=list_id)
 
         return await self.database.execute_write_fn(read)
 
     async def select_place_by_id(self, *, place_id: int) -> Optional[Place]:
         def read(conn):
-            row = conn.execute(
-                "SELECT * FROM _datasette_places_place WHERE id = ?", [place_id]
-            ).fetchone()
-            return _row_to_place(row) if row else None
+            return _queries.select_place_by_id(conn, place_id=place_id)
 
         return await self.database.execute_write_fn(read)
 
@@ -285,58 +165,36 @@ class PlacesDB:
         metadata_json: Optional[str] = None,
     ) -> Optional[Place]:
         def write(conn):
-            # Fetch current place to get list_id for bumping
-            current = conn.execute(
-                "SELECT * FROM _datasette_places_place WHERE id = ?", [place_id]
-            ).fetchone()
-            if current is None:
+            # Fetch current place so absent fields keep their existing values
+            # (partial update), and to get list_id for the parent bump.
+            cur = _queries.select_place_by_id(conn, place_id=place_id)
+            if cur is None:
                 return None
-            cur = _row_to_place(current)
-            row = conn.execute(
-                """
-                UPDATE _datasette_places_place
-                SET name = ?,
-                    address = ?,
-                    latitude = ?,
-                    longitude = ?,
-                    notes = ?,
-                    color = ?,
-                    metadata_json = ?,
-                    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-                WHERE id = ?
-                RETURNING *
-                """,
-                [
-                    name if name is not None else cur.name,
-                    address if address is not None else cur.address,
-                    latitude if latitude is not None else cur.latitude,
-                    longitude if longitude is not None else cur.longitude,
-                    notes if notes is not None else cur.notes,
-                    color if color is not None else cur.color,
-                    metadata_json if metadata_json is not None else cur.metadata_json,
-                    place_id,
-                ],
-            ).fetchone()
-            conn.execute(
-                "UPDATE _datasette_places_list SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
-                [cur.list_id],
+            place = _queries.update_place(
+                conn,
+                name=name if name is not None else cur.name,
+                address=address if address is not None else cur.address,
+                latitude=latitude if latitude is not None else cur.latitude,
+                longitude=longitude if longitude is not None else cur.longitude,
+                notes=notes if notes is not None else cur.notes,
+                color=color if color is not None else cur.color,
+                metadata_json=metadata_json
+                if metadata_json is not None
+                else cur.metadata_json,
+                place_id=place_id,
             )
-            return _row_to_place(row) if row else None
+            _queries.bump_list_updated_at(conn, list_id=cur.list_id)
+            return place
 
         return await self.database.execute_write_fn(write)
 
     async def delete_place(self, *, place_id: int) -> bool:
         def write(conn):
-            current = conn.execute(
-                "SELECT list_id FROM _datasette_places_place WHERE id = ?", [place_id]
-            ).fetchone()
-            if current is None:
+            list_id = _queries.select_place_list_id(conn, place_id=place_id)
+            if list_id is None:
                 return False
-            conn.execute("DELETE FROM _datasette_places_place WHERE id = ?", [place_id])
-            conn.execute(
-                "UPDATE _datasette_places_list SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
-                [current[0]],
-            )
+            _queries.delete_place(conn, place_id=place_id)
+            _queries.bump_list_updated_at(conn, list_id=list_id)
             return True
 
         return await self.database.execute_write_fn(write)
