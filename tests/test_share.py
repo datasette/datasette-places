@@ -203,15 +203,17 @@ async def test_non_manager_cannot_grant():
 
 @pytest.mark.asyncio
 async def test_general_access_signed_in_grant():
-    """A general-access Viewer grant for _signed_in opens view to any signed-in
-    actor but not anonymous — the dialog's 'General access' section."""
+    """A general-access Viewer grant for the 'authenticated' public audience
+    opens view to any signed-in actor but not anonymous — the dialog's 'General
+    access' section. acl v2 names public audiences by principal_type (no magic
+    actor id)."""
     ds = await _make_ds()
     list_id = await _create_list(ds, actor_id="alice")
     res = PlacesListResource(list_id)
 
     r = await ds.client.post(
         f"/-/acl/api/resource/{PLACES_LIST_RESOURCE_TYPE}/{list_id}/grant",
-        content=json.dumps({"actor_id": "_signed_in", "role": "Viewer"}),
+        content=json.dumps({"principal_type": "authenticated", "role": "Viewer"}),
         headers={"content-type": "application/json"},
         cookies=_cookie(ds, "alice"),
     )

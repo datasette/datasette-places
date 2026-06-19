@@ -10,6 +10,8 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "datasette>1a",
+    "datasette-acl>=0.6a0",
+    "datasette-acl-share>=0.0.1a4",
     "datasette-plugin-router>=0.0.1a3",
     "datasette-vite>=0.0.1a4",
     "sqlite-migrate>=0.1b0",
@@ -18,21 +20,15 @@ dependencies = [
 ]
 
 [dependency-groups]
+# datasette-debug-gotham gives `just dev` one-click login as demo actors
+# (Clark, Bruce, …) so the share flow — owner Manager grant, per-actor grants,
+# the authenticated/everyone public audiences — can be exercised by hand.
 dev = [
-    "datasette-acl",
-    "datasette-acl-share",
+    "datasette-debug-gotham>=0.1.0a3",
     "pytest",
     "pytest-asyncio",
     "ruff>=0.15.0",
 ]
-
-# Local-only: the sharing-v2 acl engine + reusable share dialog are sibling
-# checkouts, not yet published. Referenced from the dev group so places' new
-# places-list grants resolve through acl in tests and the
-# <datasette-acl-share-dialog> bundle is served via datasette-acl-share's asset helper.
-[tool.uv.sources]
-datasette-acl = { path = "../datasette-acl", editable = true }
-datasette-acl-share = { path = "../datasette-acl-share", editable = true }
 
 [build-system]
 requires = ["setuptools"]

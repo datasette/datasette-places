@@ -2,14 +2,14 @@
 
 Per-list access is answered by **datasette-acl**: the ``places-view`` /
 ``places-edit`` / ``places-manage`` actions resolve against acl grants on the
-:class:`PlacesListResource` resource (type ``places-list``). places no longer
-ships owner/shared/visibility permission SQL — owner semantics come from a
-Manager grant seeded for ``created_by`` on create (see
+:class:`PlacesListResource` resource (type ``places-list``). places ships no
+owner/shared/visibility permission SQL — owner semantics come from a Manager
+grant seeded for ``created_by`` on create (see
 :func:`seed_owner_manager_grant`); shares and general access are acl grants
-written through the share UI / data migration.
+written through the share UI.
 
-Unlike datasette-paper, places has no ``locked`` read-only flag, so it keeps
-**no** bespoke permission SQL at all — every per-list check goes through acl.
+places has no ``locked`` read-only flag, so it keeps **no** bespoke permission
+SQL at all — every per-list check goes through acl.
 
 Two global actions remain config-driven (handled by Datasette's standard
 config-permissions plugin from the ``permissions:`` block):
@@ -22,15 +22,11 @@ from __future__ import annotations
 
 from datasette.permissions import Resource
 
-try:  # acl is a soft dependency — the roles hook + grant seeding no-op when absent.
-    from datasette_acl.roles import AclRole
-except ImportError:  # pragma: no cover
-    AclRole = None
-
-try:
-    from datasette_acl.grants import grant as _acl_grant
-except ImportError:  # pragma: no cover
-    _acl_grant = None
+# datasette-acl is a hard dependency: the permission model resolves every
+# per-list check through acl grants, so its roles + grant helpers are always
+# importable.
+from datasette_acl.roles import standard_roles as _standard_roles
+from datasette_acl.grants import grant as _acl_grant, Principal as _Principal
 
 
 # Resource type name for the acl-backed model.
@@ -43,6 +39,28 @@ PLACES_LIST_ACTIONS = (
     "places-edit",
     "places-manage",
 )
+
+
+def places_roles():
+    """Viewer / Editor / Manager roles for the ``places-list`` resource type.
+
+    Built from acl's :func:`datasette_acl.roles.standard_roles` factory (the
+    canonical cumulative triple) rather than three hand-written ``AclRole``
+    objects: Viewer = view, Editor = view + edit, Manager = view + edit +
+    manage (``manage=True``, so the ``places-manage`` action authorizes
+    re-sharing). Consumed by the ``datasette_acl_roles`` hook.
+    """
+    return _standard_roles(
+        PLACES_LIST_RESOURCE_TYPE,
+        view="places-view",
+        edit="places-edit",
+        manage="places-manage",
+        descriptions={
+            "Viewer": "Can view the list",
+            "Editor": "Can view and edit the list",
+            "Manager": "Can view, edit, and manage sharing",
+        },
+    )
 
 
 class PlacesListResource(Resource):
@@ -75,16 +93,15 @@ async def seed_owner_manager_grant(datasette, list_id, created_by) -> None:
 
     Replaces the old ``created_by``-based owner SQL: ownership is now an acl
     Manager grant on the ``places-list`` resource. No-op for anonymous creates
-    (``created_by`` falsy — anonymous actors never own) and when acl isn't
-    installed.
+    (``created_by`` falsy — anonymous actors never own).
     """
-    if not created_by or _acl_grant is None:
+    if not created_by:
         return
     await _acl_grant(
         datasette,
         PLACES_LIST_RESOURCE_TYPE,
         str(list_id),
-        actor_id=str(created_by),
+        principal=_Principal.actor(str(created_by)),
         role="Manager",
         by_actor=str(created_by),
     )

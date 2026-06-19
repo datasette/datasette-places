@@ -146,11 +146,66 @@ wheels = [
 ]
 
 [[package]]
-name = "datasette-places"
+name = "datasette-acl"
+version = "0.6a0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "datasette" },
+    { name = "sqlite-migrate" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/97/1a/8db329aced833acfb2ea1cb35e828a3afbb11afb6efc4312086d7d53dbcb/datasette_acl-0.6a0.tar.gz", hash = "sha256:1c590789ea62d0aef8faa68e29d08022fb9b2cfa6cd227dd5061b1f1e79eae9b", size = 90765, upload-time = "2026-06-18T19:04:12.995Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0f/bc/855f60e78975b5cde570a5c500bcb49e1976a423e478b3414f779dc5af98/datasette_acl-0.6a0-py3-none-any.whl", hash = "sha256:1644d3b525cd1bbc13fbe6a09d57c79fe9d9c99e6ed9fab7ece421e4c018641d", size = 70732, upload-time = "2026-06-18T19:04:11.652Z" },
+]
+
+[[package]]
+name = "datasette-acl-share"
+version = "0.0.1a4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "datasette" },
+    { name = "datasette-acl" },
+    { name = "datasette-vite" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/19/09/b94367fb2edc734f1f3e902c1d07bd4e9f066afec29bb4479efd211039a3/datasette_acl_share-0.0.1a4.tar.gz", hash = "sha256:6e7a9a8dad634e7128daa68294c5cc791d6a9a6e3b1fa04105f1b6f93c89f360", size = 44274, upload-time = "2026-06-18T21:08:59.382Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ba/f7/96643ff9c556744e8d2f070545ab41612b208df208321bb563785aed689a/datasette_acl_share-0.0.1a4-py3-none-any.whl", hash = "sha256:35778223c583ce4fc2be95d0e27a9517ecd0430f29289581881bb0a78b6f8a53", size = 40038, upload-time = "2026-06-18T21:09:00.325Z" },
+]
+
+[[package]]
+name = "datasette-debug-bar"
 version = "0.0.1a1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "datasette" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/12/fc/d72442c1ca1b553f9a24426edf3d0d61eb1048e8b40961d22c9cad79e506/datasette_debug_bar-0.0.1a1.tar.gz", hash = "sha256:5390f656852cf3e3404d625757fc6f27c69be86f3784c7901b87562740085689", size = 9759, upload-time = "2026-03-19T22:07:34.921Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e3/d8/521a72d1611391b9b771dd271c2c806900436e50b2c78ca80748cab66ba4/datasette_debug_bar-0.0.1a1-py3-none-any.whl", hash = "sha256:ee4e70a2beeb1fe65784c81edb81595b5a37075443108041cf7c7da0bf5016f3", size = 9837, upload-time = "2026-03-19T22:07:33.693Z" },
+]
+
+[[package]]
+name = "datasette-debug-gotham"
+version = "0.1.0a3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "datasette" },
+    { name = "datasette-debug-bar" },
+    { name = "datasette-user-profiles" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/29/b6/1876d995bb9e17bcf3e52fff038c8bef3832da42710d975521c5c23d7a1a/datasette_debug_gotham-0.1.0a3.tar.gz", hash = "sha256:db3e4ed3d526bc16db3cbae398a9a10ab2523e7790dc2614ddce1ef476b54a10", size = 12763, upload-time = "2026-06-16T04:03:35.002Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/56/18/f22428bd300191f400744d278e041bb8abb478c67df6f09b072572ba249f/datasette_debug_gotham-0.1.0a3-py3-none-any.whl", hash = "sha256:420edd559af96c6b301e704a1fe7c23dc9f16a38f66105f6702bb908f3e36fbf", size = 13053, upload-time = "2026-06-16T04:03:33.894Z" },
+]
+
+[[package]]
+name = "datasette-places"
+version = "0.0.1a2"
 source = { editable = "." }
 dependencies = [
     { name = "datasette" },
+    { name = "datasette-acl" },
+    { name = "datasette-acl-share" },
     { name = "datasette-plugin-router" },
     { name = "datasette-vite" },
     { name = "httpx" },
@@ -160,6 +215,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "datasette-debug-gotham" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -168,6 +224,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "datasette", specifier = ">1a0" },
+    { name = "datasette-acl", specifier = ">=0.6a0" },
+    { name = "datasette-acl-share", specifier = ">=0.0.1a4" },
     { name = "datasette-plugin-router", specifier = ">=0.0.1a3" },
     { name = "datasette-vite", specifier = ">=0.0.1a4" },
     { name = "httpx", specifier = ">=0.27" },
@@ -177,6 +235,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "datasette-debug-gotham", specifier = ">=0.1.0a3" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff", specifier = ">=0.15.0" },
@@ -194,6 +253,23 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c2/d5/8dfceae428c9530f374bd3004158d39524e9f42cc32ad0f01180896b252b/datasette_plugin_router-0.0.1a3.tar.gz", hash = "sha256:07c091069c644a17402afa9cbed22b50f4c165ed54263a0b07445fb10e6806f9", size = 11534, upload-time = "2026-05-04T19:33:34.355Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/9d/f144edeae2b14aa12a9c9c9d97b8c55d0a4aaf578c6b1dc9c1dccc942af4/datasette_plugin_router-0.0.1a3-py3-none-any.whl", hash = "sha256:e9986e78acdad4889f9b3f1af4fc97f6a4e7cb2b4a48f577686463e030323cbc", size = 12521, upload-time = "2026-05-04T19:33:33.055Z" },
+]
+
+[[package]]
+name = "datasette-user-profiles"
+version = "0.1.0a8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "datasette" },
+    { name = "datasette-plugin-router" },
+    { name = "datasette-vite" },
+    { name = "pydantic" },
+    { name = "sqlite-migrate" },
+    { name = "sqlite-utils" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/76/fc/87118c33ba6e5d71275889669131d662d79f639843bacbe6019468d6f489/datasette_user_profiles-0.1.0a8.tar.gz", hash = "sha256:d5297975e2fb7c467e4635b638e2eaf5b4c126a586c9b62432d54e1afc2a58d5", size = 63130, upload-time = "2026-06-16T03:35:30.954Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/32/3dfcbdbf0a5c801c1bb597c19870effe6f09623b298e7ca2032128f06da5/datasette_user_profiles-0.1.0a8-py3-none-any.whl", hash = "sha256:c123ed41e4e01e745ce4eb673953f4d1411a9968d28d18da7e9bbc5479b470d2", size = 72341, upload-time = "2026-06-16T03:35:29.799Z" },
 ]
 
 [[package]]

@@ -39,10 +39,8 @@ class Place:
 
 
 def _row_to_list(row) -> PlaceList:
-    # Column order after m003 (visibility dropped):
+    # Column order (see migrations.m001_initial):
     #   id, name, created_by, created_at, updated_at, state, description
-    # `description` (row[6]) may be absent on a row selected before m002 added
-    # it — guard with the length check.
     return PlaceList(
         id=row[0],
         name=row[1],
@@ -50,7 +48,7 @@ def _row_to_list(row) -> PlaceList:
         created_at=row[3],
         updated_at=row[4],
         state=row[5],
-        description=row[6] if len(row) > 6 else None,
+        description=row[6],
     )
 
 

@@ -49,26 +49,26 @@ async def _create_list(ds, actor_id="alice", name="L"):
 
 
 async def _grant(ds, list_id, actor_id, role):
-    from datasette_acl.grants import grant
+    from datasette_acl.grants import grant, Principal
 
     await grant(
         ds,
         PLACES_LIST_RESOURCE_TYPE,
         str(list_id),
-        actor_id=actor_id,
+        principal=Principal.actor(actor_id),
         role=role,
         by_actor="alice",
     )
 
 
 async def _revoke(ds, list_id, actor_id):
-    from datasette_acl.grants import revoke
+    from datasette_acl.grants import revoke, Principal
 
     await revoke(
         ds,
         PLACES_LIST_RESOURCE_TYPE,
         str(list_id),
-        actor_id=actor_id,
+        principal=Principal.actor(actor_id),
         by_actor="alice",
     )
 
@@ -92,10 +92,13 @@ async def test_new_actions_registered():
 
 @pytest.mark.asyncio
 async def test_roles_registered():
+    from datasette_acl.roles import roles_for
+
     ds = await _make_ds()
-    registry = getattr(ds, "_acl_roles_registry", {})
-    roles = registry.get(PLACES_LIST_RESOURCE_TYPE)
-    assert roles, "places-list roles not in acl registry"
+    # acl resolves roles on demand from the datasette_acl_roles hook (no
+    # startup-populated registry attribute any more).
+    roles = roles_for(ds, PLACES_LIST_RESOURCE_TYPE)
+    assert roles, "places-list roles not registered with acl"
     by_name = {r.name: r for r in roles}
     assert set(by_name) == {"Viewer", "Editor", "Manager"}
     assert by_name["Viewer"].actions == ["places-view"]
