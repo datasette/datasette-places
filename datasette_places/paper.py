@@ -66,6 +66,51 @@ class PlacesResourceProvider:
         # Identity only — the web component fetches place data itself.
         return await self.resolve(datasette, actor, ref)
 
+    def picker(self):
+        # Opt into datasette-paper's insert UI: a `/`-menu "Places map" command
+        # plus a search dialog scoped to this provider's `search` below.
+        return {
+            "id": "places",
+            "label": "Places map",
+            "icon": "globe",
+            "mode": "block",
+        }
+
+    async def search(self, datasette, actor, q, limit):
+        """The actor's active place lists whose name matches ``q``. Mirrors the
+        ``allowed_resources`` enumeration in ``routes/lists.py`` so the picker
+        only ever surfaces lists the actor can view (no leak)."""
+        page = await datasette.allowed_resources(
+            action="places-view", actor=actor, limit=1000
+        )
+        list_ids = [int(r.parent) for r in page.resources]
+        if not list_ids:
+            return []
+        db = places_db(datasette)
+        rows = await db.list_lists_by_ids_and_state(list_ids=list_ids, state="active")
+        q_low = (q or "").lower()
+        matched = [r for r in rows if not q_low or q_low in (r.name or "").lower()]
+        matched.sort(
+            key=lambda r: (
+                not (r.name or "").lower().startswith(q_low),
+                (r.name or "").lower(),
+            )
+        )
+        matched = matched[:limit]
+        counts = await db.place_counts_by_list_ids([r.id for r in matched])
+        results = []
+        for r in matched:
+            count = counts.get(r.id, 0)
+            results.append(
+                {
+                    "ref": f"/-/places/list/{r.id}",
+                    "kind": "place-list",
+                    "label": r.name or f"List {r.id}",
+                    "detail": f"{count} place{'' if count == 1 else 's'}",
+                }
+            )
+        return results
+
     def frontend_assets(self, datasette):
         return {
             "js": vite_js_urls(

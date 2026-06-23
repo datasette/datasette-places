@@ -78,3 +78,46 @@ def test_frontend_assets_shape():
     assert set(assets) == {"js", "css"}
     assert isinstance(assets["js"], list)
     assert isinstance(assets["css"], list)
+
+
+def test_picker_shape():
+    spec = PlacesResourceProvider().picker()
+    assert spec == {
+        "id": "places",
+        "label": "Places map",
+        "icon": "globe",
+        "mode": "block",
+    }
+
+
+@pytest.mark.asyncio
+async def test_search_lists_viewable_maps(ds):
+    await _create_list(ds, "City Council Map")
+    await _create_list(ds, "Hiking Trails")
+    p = PlacesResourceProvider()
+    results = await p.search(ds, {"id": "test-user"}, "", 20)
+    labels = {r["label"] for r in results}
+    assert {"City Council Map", "Hiking Trails"} <= labels
+    # Shape: ref claimable by the provider + a place-count detail line.
+    by_label = {r["label"]: r for r in results}
+    council = by_label["City Council Map"]
+    assert p.claims(council["ref"])
+    assert council["kind"] == "place-list"
+    assert "place" in council["detail"]
+
+
+@pytest.mark.asyncio
+async def test_search_filters_by_query(ds):
+    await _create_list(ds, "City Council Map")
+    await _create_list(ds, "Hiking Trails")
+    p = PlacesResourceProvider()
+    results = await p.search(ds, {"id": "test-user"}, "hiking", 20)
+    assert [r["label"] for r in results] == ["Hiking Trails"]
+
+
+@pytest.mark.asyncio
+async def test_search_stranger_sees_nothing(ds):
+    await _create_list(ds, "City Council Map")
+    p = PlacesResourceProvider()
+    # A stranger has no places-view grants → empty (no leak).
+    assert await p.search(ds, {"id": "stranger"}, "", 20) == []
