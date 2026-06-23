@@ -26,6 +26,11 @@ from .permissions import (  # noqa: F401
 )
 from . import routes  # noqa: F401 — triggers decorator registration
 
+# datasette-paper integration. Importing the hookimpl into this module's
+# namespace makes Datasette discover it (pluggy scans the entry-point module);
+# the hook only fires when datasette-paper is installed and owns the spec.
+from .paper import paper_resource_provider  # noqa: F401
+
 
 # The list page is the only places page that hosts <datasette-acl-share-dialog>, so
 # the share bundle is included there (opt-in) rather than site-wide. Matches

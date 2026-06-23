@@ -15,6 +15,8 @@ export default defineConfig({
       input: {
         index: path.resolve(__dirname, "src/pages/index/main.ts"),
         list: path.resolve(__dirname, "src/pages/list/main.ts"),
+        // Web component + renderer for embedding a map in datasette-paper.
+        "paper-embed": path.resolve(__dirname, "src/pages/paper-embed/main.ts"),
       },
     },
   },

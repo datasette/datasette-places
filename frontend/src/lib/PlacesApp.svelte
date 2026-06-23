@@ -71,6 +71,14 @@
   let geocodingClick = $state(false);
   // Editable title for a place being added (defaults from the address).
   let previewName = $state("");
+  // A geocoded street address for the preview, if we have one. Clicking the map
+  // drops a pin from coordinates alone (no geocoding required); this stays null
+  // unless reverse geocoding succeeds, so we never save a coordinate string as
+  // the place's "address".
+  let previewAddress = $state<string | null>(null);
+  // Map "add" mode, surfaced in the floating panel (the in-map toolbar button
+  // can sit behind other chrome like the datasette debug bar).
+  let addMode = $state(false);
 
   /** First, most-specific part of a comma-separated address — a sane title default. */
   function shortLabel(label: string): string {
@@ -125,6 +133,7 @@
       name: result.display_name,
     };
     previewName = shortLabel(result.display_name);
+    previewAddress = result.display_name;
   }
 
   async function savePreviewAsPlace() {
@@ -136,7 +145,9 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: previewName.trim() || previewPin.name,
-          address: previewPin.name,
+          // Only a real (geocoded/searched) address — never the coordinate
+          // label we fall back to when geocoding is unavailable.
+          address: previewAddress,
           latitude: previewPin.latitude,
           longitude: previewPin.longitude,
         }),
@@ -146,6 +157,7 @@
       places = [...places, place];
       previewPin = null;
       previewName = "";
+      previewAddress = null;
       selectedId = place.id;
     } catch {
       error = "Failed to save place";
@@ -156,6 +168,7 @@
   function cancelPreview() {
     previewPin = null;
     previewName = "";
+    previewAddress = null;
   }
 
   function onSelectPlace(id: number) {
@@ -202,6 +215,9 @@
     const coordLabel = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
     previewPin = { latitude: lat, longitude: lon, name: coordLabel };
     previewName = coordLabel;
+    // No address yet — reverse geocoding below is best-effort and may be
+    // unavailable (e.g. no OpenCage key configured for this demo).
+    previewAddress = null;
     geocodingClick = true;
     try {
       const resp = await fetch(
@@ -218,10 +234,13 @@
           data.display_name
         ) {
           previewPin = { ...previewPin, name: data.display_name };
+          previewAddress = data.display_name;
           // Upgrade the title default too, unless the user already edited it.
           if (previewName === coordLabel) previewName = shortLabel(data.display_name);
         }
       }
+      // A non-200 (e.g. geocoding not configured) is swallowed: the pin stays
+      // dropped at the clicked coordinates with no address.
     } catch {
       // Keep the coordinate label on failure — non-fatal.
     }
@@ -352,6 +371,7 @@
         {selectedId}
         {previewPin}
         {canEdit}
+        bind:addMode
         onSelectPlace={onSelectPlace}
         onMapClick={onMapClick}
         onMovePlace={onMovePlace}
@@ -430,6 +450,17 @@
           {places.length === 1 ? "place" : "places"}
           · edited {relativeTime(listDetail.updated_at)}
         </div>
+
+        {#if canEdit}
+          <button
+            type="button"
+            class="add-place-btn"
+            class:active={addMode}
+            onclick={() => (addMode = !addMode)}
+          >
+            {addMode ? "Click the map to drop a pin — done" : "+ Add a place"}
+          </button>
+        {/if}
 
         {#if error}
           <div class="error-inline">{error}</div>
@@ -577,6 +608,27 @@
     margin-top: 4px;
     font-size: 0.78em;
     color: #888;
+  }
+
+  .add-place-btn {
+    margin-top: 10px;
+    width: 100%;
+    padding: 7px 10px;
+    background: #0b5cad;
+    color: #fff;
+    border: 1px solid #0b5cad;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .add-place-btn:hover {
+    background: #0a4f95;
+  }
+  .add-place-btn.active {
+    background: #fff;
+    color: #0b5cad;
   }
 
   .floating-panel :global(.places-list) {

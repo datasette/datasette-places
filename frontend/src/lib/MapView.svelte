@@ -17,6 +17,9 @@
     selectedId = null,
     previewPin = null,
     canEdit = false,
+    // Bindable so the parent (e.g. the floating sidebar) can drive add mode —
+    // the in-map toolbar button can be hidden behind other chrome.
+    addMode = $bindable(false),
     onSelectPlace,
     onMapClick,
     onMovePlace,
@@ -25,6 +28,7 @@
     selectedId: number | null;
     previewPin: { latitude: number; longitude: number; name: string } | null;
     canEdit?: boolean;
+    addMode?: boolean;
     onSelectPlace?: (id: number) => void;
     onMapClick?: (lat: number, lon: number) => void;
     onMovePlace?: (id: number, lat: number, lon: number) => void;
@@ -35,7 +39,6 @@
   let markersLayer: L.LayerGroup | undefined;
   let previewMarker: L.Marker | undefined;
   let markersById = new Map<number, L.Marker>();
-  let addMode = $state(false);
 
   // --- Marker icon rendering -------------------------------------------------
 
@@ -177,8 +180,13 @@
 
   function toggleAddMode() {
     addMode = !addMode;
-    mapEl?.classList.toggle("add-mode", addMode);
   }
+
+  // Keep the crosshair cursor in sync with add mode, whoever toggled it
+  // (in-map button or the sidebar's bindable control).
+  $effect(() => {
+    mapEl?.classList.toggle("add-mode", addMode);
+  });
 
   $effect(() => {
     // Re-render markers whenever places, selection, or edit-rights change,
