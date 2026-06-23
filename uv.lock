@@ -147,15 +147,15 @@ wheels = [
 
 [[package]]
 name = "datasette-acl"
-version = "0.6a0"
+version = "0.6a1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "datasette" },
     { name = "sqlite-migrate" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/97/1a/8db329aced833acfb2ea1cb35e828a3afbb11afb6efc4312086d7d53dbcb/datasette_acl-0.6a0.tar.gz", hash = "sha256:1c590789ea62d0aef8faa68e29d08022fb9b2cfa6cd227dd5061b1f1e79eae9b", size = 90765, upload-time = "2026-06-18T19:04:12.995Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fc/84/208e362e0e68b870a6f6b7bd366d5e481748a4c306ae9b4f3fdb4a22b48e/datasette_acl-0.6a1.tar.gz", hash = "sha256:21bd58e1aa663f48cf5a6def80dbd4125631cac91316b7a2e082e47136a5cf28", size = 94568, upload-time = "2026-06-22T17:26:44.768Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0f/bc/855f60e78975b5cde570a5c500bcb49e1976a423e478b3414f779dc5af98/datasette_acl-0.6a0-py3-none-any.whl", hash = "sha256:1644d3b525cd1bbc13fbe6a09d57c79fe9d9c99e6ed9fab7ece421e4c018641d", size = 70732, upload-time = "2026-06-18T19:04:11.652Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/4d/a885c4a48e081d3d2abf110af5a27c4e31b4429ed66fc12215a06f251e0f/datasette_acl-0.6a1-py3-none-any.whl", hash = "sha256:31f2bf5ad83b44724d70e0eeb92cc4027e1af17be741936c422f16a7440e07a2", size = 72389, upload-time = "2026-06-22T17:26:43.491Z" },
 ]
 
 [[package]]
@@ -225,7 +225,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "datasette", specifier = ">1a0" },
-    { name = "datasette-acl", specifier = ">=0.6a0" },
+    { name = "datasette-acl", specifier = ">=0.6a1" },
     { name = "datasette-acl-share", specifier = ">=0.0.1a4" },
     { name = "datasette-plugin-router", specifier = ">=0.0.1a3" },
     { name = "datasette-vite", specifier = ">=0.0.1a4" },
