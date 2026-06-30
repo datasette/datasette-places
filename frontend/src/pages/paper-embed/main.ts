@@ -14,6 +14,7 @@
  */
 import { mount, unmount } from "svelte";
 import MapView from "../../lib/MapView.svelte";
+import type { Field, MetaValue } from "../../lib/fields";
 import "leaflet/dist/leaflet.css";
 
 const LIST_RE = /^\/-\/places\/list\/(\d+)\/?$/;
@@ -36,6 +37,7 @@ type PlacePin = {
   longitude: number;
   color: string;
   shape: string;
+  metadata: Record<string, MetaValue> | null;
 };
 
 /** Fetch + map the list's places into MapView pins (read-only). */
@@ -52,7 +54,7 @@ async function fetchPins(listId: number): Promise<PlacePin[]> {
       latitude: number;
       longitude: number;
       color: string | null;
-      metadata?: { shape?: string } | null;
+      metadata?: Record<string, MetaValue> | null;
     }>;
   };
   return (data.places ?? []).map((p) => ({
@@ -62,8 +64,24 @@ async function fetchPins(listId: number): Promise<PlacePin[]> {
     latitude: p.latitude,
     longitude: p.longitude,
     color: p.color || "#3b82f6",
-    shape: p.metadata?.shape || "pin",
+    shape: (p.metadata?.shape as string) || "pin",
+    metadata: p.metadata ?? null,
   }));
+}
+
+/** The list's custom field definitions, so embed popups show their values.
+ *  Best-effort: a viewer without access (or none defined) just gets none. */
+async function fetchFields(listId: number): Promise<Field[]> {
+  try {
+    const resp = await fetch(`/-/places/api/lists/${listId}/fields`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!resp.ok) return [];
+    const data = (await resp.json()) as { fields?: Field[] };
+    return data.fields ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /** `<datasette-places-map list-id="N">` — read-only map for one place list. */
@@ -83,8 +101,13 @@ class DatasettePlacesMap extends HTMLElement {
 
   private async renderMap(listId: number): Promise<void> {
     let places: PlacePin[];
+    let fields: Field[];
     try {
-      places = await fetchPins(listId);
+      // Fields are best-effort (fetchFields never rejects); places are required.
+      [places, fields] = await Promise.all([
+        fetchPins(listId),
+        fetchFields(listId),
+      ]);
     } catch {
       this.textContent = "Could not load this map";
       return;
@@ -92,7 +115,7 @@ class DatasettePlacesMap extends HTMLElement {
     if (!this.isConnected) return; // unmounted while fetching
     this.app = mount(MapView, {
       target: this,
-      props: { places, selectedId: null, previewPin: null, canEdit: false },
+      props: { places, fields, selectedId: null, previewPin: null, canEdit: false },
     });
   }
 

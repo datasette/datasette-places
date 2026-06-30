@@ -17,6 +17,7 @@ dependencies = [
     "sqlite-migrate>=0.1b0",
     "sqlite-utils>=3.38",
     "httpx>=0.27",
+    "sqlite-quote>=0.1.1",
 ]
 
 [project.optional-dependencies]

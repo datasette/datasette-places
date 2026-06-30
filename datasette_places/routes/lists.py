@@ -16,6 +16,7 @@ from ..permissions import (
     seed_owner_manager_grant,
 )
 from ..util import read_json_body, actor_id, places_db
+from .fields import field_payload
 
 
 @router.GET(r"^/-/places/api/lists$")
@@ -88,6 +89,7 @@ async def api_get_list(datasette, request, list_id: int):
         actor=request.actor,
     )
     can_manage = await can_places_manage(datasette, request.actor, list_id)
+    field_rows = await db.select_fields_for_list(list_id=list_id)
     return Response.json(
         {
             "id": pl.id,
@@ -103,6 +105,7 @@ async def api_get_list(datasette, request, list_id: int):
                 "canManage": can_manage,
                 "isOwner": is_owner,
             },
+            "fields": [field_payload(f) for f in field_rows],
         }
     )
 

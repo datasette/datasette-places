@@ -241,6 +241,7 @@ dependencies = [
     { name = "datasette-vite" },
     { name = "httpx" },
     { name = "sqlite-migrate" },
+    { name = "sqlite-quote" },
     { name = "sqlite-utils" },
 ]
 
@@ -268,6 +269,7 @@ requires-dist = [
     { name = "datasette-vite", specifier = ">=0.0.1a4" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "sqlite-migrate", specifier = ">=0.1b0" },
+    { name = "sqlite-quote", specifier = ">=0.1.1" },
     { name = "sqlite-utils", specifier = ">=3.38" },
 ]
 provides-extras = ["paper"]
@@ -1222,6 +1224,38 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/13/86/1463a00d3c4bdb707c0ed4077d17687465a0aa9444593f66f6c4b49e39b5/sqlite-migrate-0.1b0.tar.gz", hash = "sha256:8d502b3ca4b9c45e56012bd35c03d23235f0823c976d4ce940cbb40e33087ded", size = 10736, upload-time = "2023-10-27T23:47:43.855Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/df/92/994545b912e6d6feb40323047f02ca039321e690aa2c27afcd5c4105e37b/sqlite_migrate-0.1b0-py3-none-any.whl", hash = "sha256:a4125e35e1de3dc56b6b6ec60e9833ce0ce20192b929ddcb2d4246c5098859c6", size = 9986, upload-time = "2023-10-27T23:47:42.476Z" },
+]
+
+[[package]]
+name = "sqlite-quote"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/98/b69e76b52a56e019568ebe7f2e28339b98f06997d41b2a4f85141f057e18/sqlite_quote-0.1.1.tar.gz", hash = "sha256:cf45faa7e22da0a28c9f5ce6bd799adfbb1aeaa8a925577b7a1cc2038ed58066", size = 2624020, upload-time = "2026-06-30T21:29:27.351Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a7/28/655968886c873f693e8306e54f116d3f4ec5035d21a45d6a08818d065897/sqlite_quote-0.1.1-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:2fb0c95d391d50e68693637a445c63b21f20f85c27efac9eb6c9527c5a0351a7", size = 1267611, upload-time = "2026-06-30T21:28:41.427Z" },
+    { url = "https://files.pythonhosted.org/packages/af/f2/9adf54bd128e8bca606caa39e9842176f851b1cd2afb25121b3930cd9ae4/sqlite_quote-0.1.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:64e783f5b883825ff930b8349112b5d099a731de1ddb3b1afedfa1a7ac1fa408", size = 2323525, upload-time = "2026-06-30T21:28:43.253Z" },
+    { url = "https://files.pythonhosted.org/packages/bc/b2/800091c1d161226b8907c66f342f52d64fc0d9bdb6c5835708d294fd2782/sqlite_quote-0.1.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a465415cc106e9743984283f4113a334f57dee3154486b724fa84c61837f5dca", size = 2345116, upload-time = "2026-06-30T21:28:44.752Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/7b/584e7a264c42a5a10ebb8f362d2208473de0cd8e9b546dab927eb10018bc/sqlite_quote-0.1.1-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:476e9fb9b16271a7869b128029df3e862e2cd6ac4629ef92a9b7d2f8be44e49f", size = 2310480, upload-time = "2026-06-30T21:28:46.479Z" },
+    { url = "https://files.pythonhosted.org/packages/62/38/5a533e2b1a48e5d261feb347daaa4ff159dfd2b3bf3f4d6f2e9e0f13862b/sqlite_quote-0.1.1-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:8f84200685dfe117d2cd86c047caff4fdc1e91d86629a40dc37883c2dd8b35e4", size = 2319044, upload-time = "2026-06-30T21:28:48.07Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/c8/a880b406f67a7a44eacf581685ee2b8b857d7402353a40390b058b636524/sqlite_quote-0.1.1-cp310-cp310-win_amd64.whl", hash = "sha256:e85b7523376c15456f046de576c91504965988cbcfe73556cef307a3deb2acae", size = 572771, upload-time = "2026-06-30T21:28:49.634Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/4d/fea8889ea3b2ba921ccdb2f03e80304fe2533bf0db75c27d89595473c5a7/sqlite_quote-0.1.1-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:40989552708ac961a95d50490b7e01287d7eff704e1cda9d6f4e876e54f9050e", size = 1267608, upload-time = "2026-06-30T21:28:51.073Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/53/164de5b48f457aff283c062adf81f36531c96449f1173b5218ce3f3e83f4/sqlite_quote-0.1.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1cd4af6562b087b981df907eceee43dc9c59974ea0100b5fbc1b44e0e036ea72", size = 2324226, upload-time = "2026-06-30T21:28:52.607Z" },
+    { url = "https://files.pythonhosted.org/packages/af/fa/093299f500c376903cfc90cae237d3101f3e21fe151bc0e652e3747cf750/sqlite_quote-0.1.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c5ef3cf9c76c9a3f7587d00ccf17d733d64d249f97d720bfb6edd627d651ef22", size = 2345702, upload-time = "2026-06-30T21:28:54.252Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/e8/6936f7d00bcc730734078caf39fb9b59accec29279ffaeea3e38e75f9f62/sqlite_quote-0.1.1-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:6850cd4bf7d2835b7fb72a605f43bafc60ba1193480d1d5222070b65ed5cd19d", size = 2311100, upload-time = "2026-06-30T21:28:55.552Z" },
+    { url = "https://files.pythonhosted.org/packages/20/26/f5e5ba74385838f7b93b0797893ad8380f763c7bbc525f578a1aa9787991/sqlite_quote-0.1.1-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:ca14c34a747b6bba765dc10083dc77b3081a60f2489b99537201f6bf365af22d", size = 2319832, upload-time = "2026-06-30T21:28:57.045Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/ff/4e78dcd8a7039aad3484b342ecc3982245220944939a28458ae70b5a0b71/sqlite_quote-0.1.1-cp311-cp311-win_amd64.whl", hash = "sha256:8b62fe60b117cfbb7e2b13a73526cea24c64e774cd43d5d0eb93b8b639165e76", size = 572761, upload-time = "2026-06-30T21:28:58.431Z" },
+    { url = "https://files.pythonhosted.org/packages/40/95/4f47237e77a602b7cf74d60c5344d82f7658e29b9171989dfeab945142dc/sqlite_quote-0.1.1-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:5448ea429281a4246b9576a309ceded4086c16f3a1be9b76fde0ee0dc83787b2", size = 1269107, upload-time = "2026-06-30T21:28:59.779Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/37/8c291ba735a04fcc2ec5cf97527282ea3ce81d8e558fba942915c54674a4/sqlite_quote-0.1.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:dc43e755bdd265f551012e1f9e7d25fa50be0ee973a653171514cde29eaf4beb", size = 2324500, upload-time = "2026-06-30T21:29:01.131Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/ab/7f52d4e695c72ba4ce7cd84cd2622dd62cf250cde48b252d748c3b386ced/sqlite_quote-0.1.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f9f6e660330a14bf73d7c0c42dd84c68a268df8504f069b704db90dd0a538f90", size = 2346093, upload-time = "2026-06-30T21:29:02.75Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/e9/d88ce6bedb027df441330947dd02de002325b6990c536e927e7ad64d57fe/sqlite_quote-0.1.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:af864ddc37cf6e409aa12afc23ebdcd1f2b179f6aad2e885bfe5e6c6db2c4586", size = 2311465, upload-time = "2026-06-30T21:29:04.071Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/02/0c29671f29cacc19e959682fbe358e83ca94b7351ae87acba2bc5ae48be7/sqlite_quote-0.1.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:c30d3844381dd4dd2aecdac35d492c211ce1f3ae758bd713c15949b63f6c71b1", size = 2321272, upload-time = "2026-06-30T21:29:05.568Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/7c/8083dc744e9df5f7065c387bef2ad6f8551ab87b58ffbcb76ae42e4e4fe0/sqlite_quote-0.1.1-cp312-cp312-win_amd64.whl", hash = "sha256:0615a52be9462f2d7a07a089023d9aaa64d882599f8d8232987b110b01773453", size = 572770, upload-time = "2026-06-30T21:29:07.314Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/76/f5cc79f818515801138049866d60c49e3147611fe6de256e1f2b308ed10a/sqlite_quote-0.1.1-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:5591ca052e2cffb2871018499d1ec65aed616b7b34a8a2880e7fce191bb57427", size = 1269109, upload-time = "2026-06-30T21:29:08.896Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/57/cb65d36b91160f5db5c13bb41d9761978f962f22196949a6bc06c0fbb7ac/sqlite_quote-0.1.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6f52cb0b29be0b00b7e96c186cc964caa1f6dbbdc890a214bd9bd088cff9dec4", size = 2324485, upload-time = "2026-06-30T21:29:10.427Z" },
+    { url = "https://files.pythonhosted.org/packages/09/f3/cc64c060a2f51b1a9c43eee9193ec7e4086fbe4e3ccd030498b7742aa65e/sqlite_quote-0.1.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2792f0a6f48224c66839447e2e9c2d42210b86c29efe20962cbf2c267685c8fd", size = 2346064, upload-time = "2026-06-30T21:29:12.628Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/81/ff8fd9a9e8de34613011d72babcc13407c873c8fd4b035d029409d2a71b0/sqlite_quote-0.1.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:0dbd89ab7acad55498df3676651a5a007a23095d5f696da2f9d3ad13242e7556", size = 2311533, upload-time = "2026-06-30T21:29:14.206Z" },
+    { url = "https://files.pythonhosted.org/packages/46/30/9151edb47559f076e9830e66e53e7a82617dc1e5b4f320b5b510c358e257/sqlite_quote-0.1.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:6dbd355358214c7edca3586feec5878b8b44b75f36555bee7eae65bb569aec94", size = 2321389, upload-time = "2026-06-30T21:29:15.621Z" },
+    { url = "https://files.pythonhosted.org/packages/66/e6/8aba888e497cb3557f698d472819cd0fae8518370f8591e59304f5cdb6ab/sqlite_quote-0.1.1-cp313-cp313-win_amd64.whl", hash = "sha256:d31a9a1703b8c5b0cfa1713b0c9a49706f970f1a820082eae40019d07f577c9f", size = 572775, upload-time = "2026-06-30T21:29:16.966Z" },
 ]
 
 [[package]]

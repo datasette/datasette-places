@@ -44,6 +44,21 @@ class Place:
     updated_at: str
 
 
+@dataclass
+class ListField:
+    id: int
+    list_id: int
+    key: str
+    label: str
+    type: str
+    position: int
+    required: int
+    is_unique: int
+    config_json: str
+    created_at: str
+    updated_at: str
+
+
 def insert_list(
     conn: sqlite3.Connection, name: str, created_by: str | None
 ) -> PlaceList | None:
@@ -286,3 +301,153 @@ def delete_place(conn: sqlite3.Connection, place_id: int) -> None:
     params = {"place_id::integer": place_id}
     conn.execute(sql, params)
     return None
+
+
+def insert_list_field(
+    conn: sqlite3.Connection,
+    list_id: int,
+    key: str,
+    label: str,
+    type: str,
+    position: int,
+    required: int,
+    is_unique: int,
+    config_json: str,
+) -> ListField | None:
+    sql = """\
+INSERT INTO _datasette_places_list_field
+    (list_id, key, label, type, position, required, is_unique, config_json)
+VALUES
+    ($list_id::integer, $key::text, $label::text, $type::text, $position::integer,
+     $required::integer, $is_unique::integer, $config_json::text)
+RETURNING id, list_id, key, label, type, position, required, is_unique, config_json, created_at, updated_at;
+"""
+    params = {
+        "list_id::integer": list_id,
+        "key::text": key,
+        "label::text": label,
+        "type::text": type,
+        "position::integer": position,
+        "required::integer": required,
+        "is_unique::integer": is_unique,
+        "config_json::text": config_json,
+    }
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return ListField(*row) if row is not None else None
+
+
+def select_fields_for_list(conn: sqlite3.Connection, list_id: int) -> list[ListField]:
+    sql = """\
+SELECT id, list_id, key, label, type, position, required, is_unique, config_json, created_at, updated_at
+FROM _datasette_places_list_field
+WHERE list_id = $list_id::integer
+ORDER BY position ASC, id ASC;
+"""
+    params = {"list_id::integer": list_id}
+    cursor = conn.execute(sql, params)
+    return [ListField(*row) for row in cursor.fetchall()]
+
+
+def select_list_field_by_id(
+    conn: sqlite3.Connection, field_id: int
+) -> ListField | None:
+    sql = """\
+SELECT id, list_id, key, label, type, position, required, is_unique, config_json, created_at, updated_at
+FROM _datasette_places_list_field
+WHERE id = $field_id::integer;
+"""
+    params = {"field_id::integer": field_id}
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return ListField(*row) if row is not None else None
+
+
+def max_field_position_for_list(conn: sqlite3.Connection, list_id: int) -> Any | None:
+    sql = """\
+SELECT COALESCE(MAX(position), -1) FROM _datasette_places_list_field
+WHERE list_id = $list_id::integer;
+"""
+    params = {"list_id::integer": list_id}
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return row[0] if row is not None else None
+
+
+def update_list_field(
+    conn: sqlite3.Connection,
+    label: str,
+    type: str,
+    position: int,
+    required: int,
+    is_unique: int,
+    config_json: str,
+    field_id: int,
+) -> ListField | None:
+    sql = """\
+UPDATE _datasette_places_list_field
+SET label = $label::text,
+    type = $type::text,
+    position = $position::integer,
+    required = $required::integer,
+    is_unique = $is_unique::integer,
+    config_json = $config_json::text,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+WHERE id = $field_id::integer
+RETURNING id, list_id, key, label, type, position, required, is_unique, config_json, created_at, updated_at;
+"""
+    params = {
+        "label::text": label,
+        "type::text": type,
+        "position::integer": position,
+        "required::integer": required,
+        "is_unique::integer": is_unique,
+        "config_json::text": config_json,
+        "field_id::integer": field_id,
+    }
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return ListField(*row) if row is not None else None
+
+
+def delete_list_field(conn: sqlite3.Connection, field_id: int) -> None:
+    sql = "DELETE FROM _datasette_places_list_field WHERE id = $field_id::integer;"
+    params = {"field_id::integer": field_id}
+    conn.execute(sql, params)
+    return None
+
+
+def set_place_metadata_key(
+    conn: sqlite3.Connection, key: str, value_json: str, place_id: int
+) -> Place | None:
+    sql = """\
+UPDATE _datasette_places_place
+SET metadata_json = json_set(COALESCE(metadata_json, '{}'), '$.' || $key::text, json($value_json::text)),
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+WHERE id = $place_id::integer
+RETURNING id, list_id, name, address, latitude, longitude, notes, color, metadata_json, created_by, created_at, updated_at;
+"""
+    params = {
+        "key::text": key,
+        "value_json::text": value_json,
+        "place_id::integer": place_id,
+    }
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return Place(*row) if row is not None else None
+
+
+def remove_place_metadata_key(
+    conn: sqlite3.Connection, key: str, place_id: int
+) -> Place | None:
+    sql = """\
+UPDATE _datasette_places_place
+SET metadata_json = json_remove(COALESCE(metadata_json, '{}'), '$.' || $key::text),
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+WHERE id = $place_id::integer
+RETURNING id, list_id, name, address, latitude, longitude, notes, color, metadata_json, created_by, created_at, updated_at;
+"""
+    params = {"key::text": key, "place_id::integer": place_id}
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return Place(*row) if row is not None else None

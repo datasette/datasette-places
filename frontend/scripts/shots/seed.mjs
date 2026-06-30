@@ -24,26 +24,51 @@ async function api(path, { actor, method = "POST", body } = {}) {
   return resp.json();
 }
 
-async function createList(name, places) {
+async function createList(name, places, fields = []) {
   const { id } = await api(`/-/places/api/lists`, {
     actor: OWNER,
     body: { name },
   });
+  // Declare the list's custom metadata fields before adding places, so place
+  // `metadata` values validate against them and surface in the table view.
+  for (const f of fields) {
+    await api(`/-/places/api/lists/${id}/fields`, { actor: OWNER, body: f });
+  }
   for (const p of places) {
     await api(`/-/places/api/lists/${id}/places`, { actor: OWNER, body: p });
   }
   return id;
 }
 
+// Custom metadata fields for the coffee list — exercises rating/select/url/
+// boolean renderers in the table view + attribute form.
+const COFFEE_FIELDS = [
+  { key: "rating", label: "Rating", type: "rating", config: { max: 5 } },
+  {
+    key: "vibe",
+    label: "Vibe",
+    type: "select",
+    config: {
+      options: [
+        { value: "cozy", label: "Cozy", color: "#b5651d" },
+        { value: "minimal", label: "Minimal", color: "#475569" },
+        { value: "lively", label: "Lively", color: "#d27d2d" },
+      ],
+    },
+  },
+  { key: "instagram", label: "Instagram", type: "url" },
+  { key: "wifi", label: "Wi-Fi", type: "boolean" },
+];
+
 // A walkable downtown-Portland coffee crawl — markers cluster nicely at city
-// zoom.
+// zoom. Each carries custom-field metadata declared in COFFEE_FIELDS.
 const COFFEE = [
-  { name: "Heart Coffee Roasters", latitude: 45.5226, longitude: -122.6587, color: "#b5651d", address: "2211 E Burnside St, Portland, OR" },
-  { name: "Coava Coffee", latitude: 45.5152, longitude: -122.6566, color: "#6f4e37", address: "1300 SE Grand Ave, Portland, OR" },
-  { name: "Stumptown HQ", latitude: 45.5121, longitude: -122.6543, color: "#3b2f2f", address: "100 SE Salmon St, Portland, OR" },
-  { name: "Never Coffee", latitude: 45.5108, longitude: -122.6186, color: "#d27d2d", address: "4243 SE Belmont St, Portland, OR" },
-  { name: "Good Coffee", latitude: 45.5189, longitude: -122.6411, color: "#a0522d", address: "4747 SE Division St, Portland, OR" },
-  { name: "Either/Or", latitude: 45.4742, longitude: -122.6312, color: "#8b5a2b", address: "8235 SE 13th Ave, Portland, OR" },
+  { name: "Heart Coffee Roasters", latitude: 45.5226, longitude: -122.6587, color: "#b5651d", address: "2211 E Burnside St, Portland, OR", metadata: { rating: 5, vibe: "minimal", instagram: "https://instagram.com/heartroasters", wifi: true } },
+  { name: "Coava Coffee", latitude: 45.5152, longitude: -122.6566, color: "#6f4e37", address: "1300 SE Grand Ave, Portland, OR", metadata: { rating: 5, vibe: "minimal", instagram: "https://instagram.com/coavacoffee", wifi: true } },
+  { name: "Stumptown HQ", latitude: 45.5121, longitude: -122.6543, color: "#3b2f2f", address: "100 SE Salmon St, Portland, OR", metadata: { rating: 4, vibe: "cozy", instagram: "https://instagram.com/stumptowncoffee", wifi: false } },
+  { name: "Never Coffee", latitude: 45.5108, longitude: -122.6186, color: "#d27d2d", address: "4243 SE Belmont St, Portland, OR", metadata: { rating: 4.5, vibe: "lively", instagram: "https://instagram.com/nevercoffee", wifi: true } },
+  { name: "Good Coffee", latitude: 45.5189, longitude: -122.6411, color: "#a0522d", address: "4747 SE Division St, Portland, OR", metadata: { rating: 3.5, vibe: "cozy", instagram: "https://instagram.com/goodcoffeepdx", wifi: true } },
+  { name: "Either/Or", latitude: 45.4742, longitude: -122.6312, color: "#8b5a2b", address: "8235 SE 13th Ave, Portland, OR", metadata: { rating: 4, vibe: "lively", instagram: "https://instagram.com/eitherorcafe", wifi: false } },
 ];
 
 const HIKES = [
@@ -71,7 +96,7 @@ async function createPaperDoc(listId) {
 }
 
 export async function seed() {
-  const primaryList = await createList("Portland Coffee Tour", COFFEE);
+  const primaryList = await createList("Portland Coffee Tour", COFFEE, COFFEE_FIELDS);
   const secondaryList = await createList("Weekend Hikes", HIKES);
 
   // Share the primary list with bob (Editor) for the share-dialog shot.
