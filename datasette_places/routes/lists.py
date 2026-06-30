@@ -4,6 +4,9 @@ from datasette import Forbidden, Response
 
 from ..router import router
 from ..permissions import (
+    ACTION_EDIT,
+    ACTION_MANAGE,
+    ACTION_VIEW,
     PlacesListResource,
     can_places_manage,
     ensure_places_create,
@@ -25,7 +28,7 @@ async def api_list_lists(datasette, request):
         )
 
     page = await datasette.allowed_resources(
-        action="places-view", actor=request.actor, limit=1000
+        action=ACTION_VIEW, actor=request.actor, limit=1000
     )
     list_ids = [int(r.parent) for r in page.resources]
     db = places_db(datasette)
@@ -80,7 +83,7 @@ async def api_get_list(datasette, request, list_id: int):
     me = actor_id(request)
     is_owner = pl.created_by is not None and pl.created_by == me
     can_edit = await datasette.allowed(
-        action="places-edit",
+        action=ACTION_EDIT,
         resource=PlacesListResource(list_id),
         actor=request.actor,
     )
@@ -147,7 +150,7 @@ async def _ensure_owner(datasette, request, list_id: int):
     if pl is None:
         return None
     if not await can_places_manage(datasette, request.actor, list_id):
-        raise Forbidden("places-manage")
+        raise Forbidden(ACTION_MANAGE)
     return pl
 
 
@@ -206,13 +209,10 @@ async def places_list_page(datasette, request, list_id: int):
                 "page_title": pl.name or f"Places {list_id}",
                 "entrypoint": "src/pages/list/main.ts",
                 # actor is surfaced so the embedded <datasette-acl-share-dialog> can
-                # mark the current user's row "(you)". csrftoken is optional
-                # under datasette 1.0a30 (same-origin fetches need none) but is
-                # forwarded for forward/back-compat with older asgi-csrf builds.
+                # mark the current user's row "(you)".
                 "page_data": {
                     "list_id": list_id,
                     "actor": request.actor,
-                    "csrftoken": request.scope.get("csrftoken", lambda: "")(),
                 },
             },
             request=request,

@@ -5,15 +5,24 @@ from datasette import hookimpl, Response
 from datasette.permissions import Action
 from datasette_vite import vite_entry
 
+# datasette-acl is a hard dependency: the per-list permission model resolves
+# through acl grants and friendly roles, so its role factory is always
+# importable.
+from datasette_acl.roles import standard_roles
+
 # datasette-acl-share is a hard dependency: the list page hosts its
 # <datasette-acl-share-dialog>, so its asset helper is always importable.
 from datasette_acl_share import datasette_share_assets as _share_assets
 
 from .router import router
 from .permissions import (  # noqa: F401
+    ACTION_CREATE,
+    ACTION_EDIT,
+    ACTION_LIST,
+    ACTION_MANAGE,
+    ACTION_VIEW,
     PlacesListResource,
     PLACES_LIST_RESOURCE_TYPE,
-    places_roles,
 )
 from . import routes  # noqa: F401 — triggers decorator registration
 
@@ -115,34 +124,34 @@ def register_actions(datasette):
     return [
         # --- Global actions (unchanged) -------------------------------------
         Action(
-            name="datasette-places-list",
+            name=ACTION_LIST,
             description="Can list place lists (see the index page)",
         ),
         Action(
-            name="datasette-places-create",
+            name=ACTION_CREATE,
             description="Can create new place lists",
-            also_requires="datasette-places-list",
+            also_requires=ACTION_LIST,
         ),
         # --- acl-backed resource actions ------------------------------------
         # These resolve against datasette-acl grants on PlacesListResource.
         # Every per-list permission check goes through these; places no longer
         # ships owner/shared/visibility SQL.
         Action(
-            name="places-view",
+            name=ACTION_VIEW,
             description="View a place list",
             resource_class=PlacesListResource,
         ),
         Action(
-            name="places-edit",
+            name=ACTION_EDIT,
             description="Edit a place list",
             resource_class=PlacesListResource,
-            also_requires="places-view",
+            also_requires=ACTION_VIEW,
         ),
         Action(
-            name="places-manage",
+            name=ACTION_MANAGE,
             description="Manage sharing for a place list",
             resource_class=PlacesListResource,
-            also_requires="places-view",
+            also_requires=ACTION_VIEW,
         ),
     ]
 
@@ -152,17 +161,27 @@ def datasette_acl_roles(datasette):
     """Friendly Viewer / Editor / Manager roles for the ``places-list`` type.
 
     Consumed by datasette-acl's role registry (see ``build_roles_registry`` /
-    ``roles_for``). Built via acl's ``standard_roles`` factory in
-    :func:`datasette_places.permissions.places_roles`; no-op (``[]``) when acl
-    is not installed.
+    ``roles_for``). Built straight from acl's ``standard_roles`` factory — the
+    canonical cumulative Viewer / Editor / Manager triple (Manager carries
+    ``manage=True``, so ``places-manage`` authorizes re-sharing).
     """
-    return places_roles()
+    return standard_roles(
+        PLACES_LIST_RESOURCE_TYPE,
+        view=ACTION_VIEW,
+        edit=ACTION_EDIT,
+        manage=ACTION_MANAGE,
+        descriptions={
+            "Viewer": "Can view the list",
+            "Editor": "Can view and edit the list",
+            "Manager": "Can view, edit, and manage sharing",
+        },
+    )
 
 
 @hookimpl
 def menu_links(datasette, actor, request=None):
     async def inner():
-        if await datasette.allowed(action="datasette-places-list", actor=actor):
+        if await datasette.allowed(action=ACTION_LIST, actor=actor):
             return [
                 {
                     "href": datasette.urls.path("/-/places/"),

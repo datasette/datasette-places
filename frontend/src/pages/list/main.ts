@@ -7,7 +7,6 @@ import { loadPageData } from "../../lib/pageData";
 const pageData = loadPageData<{
   list_id: number;
   actor: { id: string } | null;
-  csrftoken: string;
 }>();
 
 mount(PlacesApp, {
@@ -15,6 +14,5 @@ mount(PlacesApp, {
   props: {
     listId: pageData.list_id,
     actor: pageData.actor ?? null,
-    csrftoken: pageData.csrftoken ?? "",
   },
 });

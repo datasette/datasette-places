@@ -52,11 +52,9 @@
   let {
     listId,
     actor = null,
-    csrftoken = "",
   }: {
     listId: number;
     actor?: { id: string } | null;
-    csrftoken?: string;
   } = $props();
 
   let listDetail = $state<ListDetail | null>(null);

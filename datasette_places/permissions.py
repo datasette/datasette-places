@@ -25,7 +25,6 @@ from datasette.permissions import Resource
 # datasette-acl is a hard dependency: the permission model resolves every
 # per-list check through acl grants, so its roles + grant helpers are always
 # importable.
-from datasette_acl.roles import standard_roles as _standard_roles
 from datasette_acl.grants import grant as _acl_grant, Principal as _Principal
 
 
@@ -33,34 +32,18 @@ from datasette_acl.grants import grant as _acl_grant, Principal as _Principal
 PLACES_LIST_RESOURCE_TYPE = "places-list"
 
 # Resource-scoped actions, resolved by datasette-acl against grants on
-# PlacesListResource.
-PLACES_LIST_ACTIONS = (
-    "places-view",
-    "places-edit",
-    "places-manage",
-)
+# PlacesListResource. Referenced by name throughout the plugin via these
+# constants rather than bare string literals.
+ACTION_VIEW = "places-view"
+ACTION_EDIT = "places-edit"
+ACTION_MANAGE = "places-manage"
 
+PLACES_LIST_ACTIONS = (ACTION_VIEW, ACTION_EDIT, ACTION_MANAGE)
 
-def places_roles():
-    """Viewer / Editor / Manager roles for the ``places-list`` resource type.
-
-    Built from acl's :func:`datasette_acl.roles.standard_roles` factory (the
-    canonical cumulative triple) rather than three hand-written ``AclRole``
-    objects: Viewer = view, Editor = view + edit, Manager = view + edit +
-    manage (``manage=True``, so the ``places-manage`` action authorizes
-    re-sharing). Consumed by the ``datasette_acl_roles`` hook.
-    """
-    return _standard_roles(
-        PLACES_LIST_RESOURCE_TYPE,
-        view="places-view",
-        edit="places-edit",
-        manage="places-manage",
-        descriptions={
-            "Viewer": "Can view the list",
-            "Editor": "Can view and edit the list",
-            "Manager": "Can view, edit, and manage sharing",
-        },
-    )
+# Global, config-driven actions (resolved by Datasette's config-permissions
+# plugin, not acl).
+ACTION_LIST = "datasette-places-list"
+ACTION_CREATE = "datasette-places-create"
 
 
 class PlacesListResource(Resource):
@@ -113,20 +96,16 @@ async def seed_owner_manager_grant(datasette, list_id, created_by) -> None:
 
 
 async def ensure_places_list(datasette, request) -> None:
-    await datasette.ensure_permission(
-        action="datasette-places-list", actor=request.actor
-    )
+    await datasette.ensure_permission(action=ACTION_LIST, actor=request.actor)
 
 
 async def ensure_places_create(datasette, request) -> None:
-    await datasette.ensure_permission(
-        action="datasette-places-create", actor=request.actor
-    )
+    await datasette.ensure_permission(action=ACTION_CREATE, actor=request.actor)
 
 
 async def ensure_places_view(datasette, request, list_id) -> None:
     await datasette.ensure_permission(
-        action="places-view",
+        action=ACTION_VIEW,
         resource=PlacesListResource(list_id),
         actor=request.actor,
     )
@@ -134,7 +113,7 @@ async def ensure_places_view(datasette, request, list_id) -> None:
 
 async def ensure_places_edit(datasette, request, list_id) -> None:
     await datasette.ensure_permission(
-        action="places-edit",
+        action=ACTION_EDIT,
         resource=PlacesListResource(list_id),
         actor=request.actor,
     )
@@ -143,7 +122,7 @@ async def ensure_places_edit(datasette, request, list_id) -> None:
 async def can_places_edit(datasette, actor, list_id) -> bool:
     """Like ensure_places_edit but returns True/False without raising."""
     return await datasette.allowed(
-        action="places-edit",
+        action=ACTION_EDIT,
         resource=PlacesListResource(list_id),
         actor=actor,
     )
@@ -157,7 +136,7 @@ async def can_places_manage(datasette, actor, list_id) -> bool:
     -equality owner check.
     """
     return await datasette.allowed(
-        action="places-manage",
+        action=ACTION_MANAGE,
         resource=PlacesListResource(list_id),
         actor=actor,
     )
