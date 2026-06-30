@@ -19,6 +19,15 @@ dependencies = [
     "httpx>=0.27",
 ]
 
+[project.optional-dependencies]
+# `datasette-places[paper]` adds datasette-paper so a Places map can be
+# pasted/embedded as a rich block inside a paper document (see paper.py + the
+# frontend paper-embed target). `just dev` runs with this extra so the embed
+# flow is exercisable by hand. Resolved from PyPI.
+paper = [
+    "datasette-paper>=0.0.2a3",
+]
+
 [dependency-groups]
 # datasette-debug-gotham gives `just dev` one-click login as demo actors
 # (Clark, Bruce, …) so the share flow — owner Manager grant, per-actor grants,
