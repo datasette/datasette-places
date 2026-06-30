@@ -23,14 +23,10 @@ dependencies = [
 # `datasette-places[paper]` adds datasette-paper so a Places map can be
 # pasted/embedded as a rich block inside a paper document (see paper.py + the
 # frontend paper-embed target). `just dev` runs with this extra so the embed
-# flow is exercisable by hand. datasette-paper isn't on PyPI yet, so it's
-# resolved from the sibling checkout's built wheel via [tool.uv.sources] below.
+# flow is exercisable by hand. Resolved from PyPI.
 paper = [
     "datasette-paper>=0.0.2a3",
 ]
-
-[tool.uv.sources]
-datasette-paper = { path = "../datasette-paper/dist/datasette_paper-0.0.2a3-py3-none-any.whl" }
 
 [dependency-groups]
 # datasette-debug-gotham gives `just dev` one-click login as demo actors

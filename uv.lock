@@ -210,7 +210,7 @@ wheels = [
 [[package]]
 name = "datasette-paper"
 version = "0.0.2a3"
-source = { path = "../datasette-paper/dist/datasette_paper-0.0.2a3-py3-none-any.whl" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "datasette" },
     { name = "datasette-acl" },
@@ -224,23 +224,9 @@ dependencies = [
     { name = "sqlite-migrate" },
     { name = "sqlite-utils" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/5d/0a/46b4c6bf7d32915d7b555603816cbd701119a32ca16d816a014943679aed/datasette_paper-0.0.2a3.tar.gz", hash = "sha256:7be86a861dec53a92bba9e56ce1361785aa779781c8eb14b1a1b62757ada2681", size = 623875, upload-time = "2026-06-30T00:24:04.804Z" }
 wheels = [
-    { filename = "datasette_paper-0.0.2a3-py3-none-any.whl", hash = "sha256:0f01794ad5af9dcdaf371f89f5347bc3e703d6b9b660f5f970ff436c4dd53d1f" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "datasette", specifier = ">1a0" },
-    { name = "datasette-acl", specifier = ">=0.6a1" },
-    { name = "datasette-acl-share", specifier = ">=0.0.1a4" },
-    { name = "datasette-plugin-router", specifier = ">=0.0.1a4" },
-    { name = "datasette-user-profiles", specifier = ">=0.1.0a8" },
-    { name = "datasette-vite", specifier = ">=0.0.1a4" },
-    { name = "markdown-it-py", extras = ["plugins"], specifier = ">=3.0" },
-    { name = "prosemirror", specifier = ">=0.6.1" },
-    { name = "pydantic", specifier = ">=2" },
-    { name = "sqlite-migrate", specifier = ">=0.1b0" },
-    { name = "sqlite-utils", specifier = ">=3.38" },
+    { url = "https://files.pythonhosted.org/packages/45/d4/eb53fbb0c381e92032cdc1b1bf1538bbcb00ed265a7846a63f98d7dfd73e/datasette_paper-0.0.2a3-py3-none-any.whl", hash = "sha256:0910955ee16deac2b7a9ec3b7c30d9856d8364d55f6e7052e21f0c68137a0dca", size = 551196, upload-time = "2026-06-30T00:24:03.38Z" },
 ]
 
 [[package]]
@@ -277,7 +263,7 @@ requires-dist = [
     { name = "datasette", specifier = ">1a0" },
     { name = "datasette-acl", specifier = ">=0.6a1" },
     { name = "datasette-acl-share", specifier = ">=0.0.1a4" },
-    { name = "datasette-paper", marker = "extra == 'paper'", path = "../datasette-paper/dist/datasette_paper-0.0.2a3-py3-none-any.whl" },
+    { name = "datasette-paper", marker = "extra == 'paper'", specifier = ">=0.0.2a3" },
     { name = "datasette-plugin-router", specifier = ">=0.0.1a3" },
     { name = "datasette-vite", specifier = ">=0.0.1a4" },
     { name = "httpx", specifier = ">=0.27" },
