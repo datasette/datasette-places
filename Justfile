@@ -9,6 +9,20 @@ frontend *flags:
 frontend-dev *flags:
     npm run dev --prefix frontend -- --port {{DEV_PORT}} {{flags}}
 
+# --- Documentation screenshots ---
+
+# Capture the committed docs/screenshots/*.png. Builds the production frontend,
+# boots a throwaway datasette (with the `paper` extra) and seeded demo data, and
+# drives headless Chromium for deterministic, no-diff output. Map tiles are
+# cached under frontend/scripts/shots/.tile-cache (gitignored) so runs after the
+# first are offline. `just shots` for all; `just shots map share` for a subset.
+# Manual local task — NOT run in CI. Re-run and confirm `git status` is clean.
+shots *names:
+    just frontend
+    npm --prefix frontend install
+    npm --prefix frontend exec -- playwright install chromium
+    node frontend/scripts/screenshots.mjs {{names}}
+
 # --- Formatting ---
 
 format-backend *flags:
