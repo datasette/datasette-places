@@ -166,9 +166,9 @@ async def test_owner_can_view_edit_manage_own_list():
 
     res = PlacesListResource(list_id)
     for action in ("places-view", "places-edit", "places-manage"):
-        assert await ds.allowed(
-            action=action, resource=res, actor={"id": "alice"}
-        ), action
+        assert await ds.allowed(action=action, resource=res, actor={"id": "alice"}), (
+            action
+        )
 
 
 @pytest.mark.asyncio
@@ -237,9 +237,9 @@ async def test_manager_grant_allows_all_three():
 
     res = PlacesListResource(list_id)
     for action in ("places-view", "places-edit", "places-manage"):
-        assert await ds.allowed(
-            action=action, resource=res, actor={"id": "dave"}
-        ), action
+        assert await ds.allowed(action=action, resource=res, actor={"id": "dave"}), (
+            action
+        )
 
 
 @pytest.mark.asyncio

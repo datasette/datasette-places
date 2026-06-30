@@ -128,9 +128,7 @@ async def test_owner_can_read_grants_via_acl_api():
     assert r.status_code == 200, r.text
     data = r.json()
     assert data["can_manage"] is True
-    actor_grants = {
-        g["id"] for g in data["grants"] if g["principal"] == "actor"
-    }
+    actor_grants = {g["id"] for g in data["grants"] if g["principal"] == "actor"}
     assert "alice" in actor_grants
 
 
@@ -154,9 +152,7 @@ async def test_grant_update_revoke_round_trip():
     assert r.status_code == 200, r.text
     assert r.json()["ok"] is True
     assert await ds.allowed(action="places-view", resource=res, actor={"id": "bob"})
-    assert not await ds.allowed(
-        action="places-edit", resource=res, actor={"id": "bob"}
-    )
+    assert not await ds.allowed(action="places-edit", resource=res, actor={"id": "bob"})
 
     # Update to Editor.
     r = await ds.client.post(
@@ -176,9 +172,7 @@ async def test_grant_update_revoke_round_trip():
         cookies=alice,
     )
     assert r.status_code == 200, r.text
-    assert not await ds.allowed(
-        action="places-view", resource=res, actor={"id": "bob"}
-    )
+    assert not await ds.allowed(action="places-view", resource=res, actor={"id": "bob"})
 
 
 @pytest.mark.asyncio
