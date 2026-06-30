@@ -6,8 +6,6 @@ dynamic artifacts (expanded view + unique indexes) inside ``PlacesDB`` so they
 stay in sync with the defs.
 """
 
-import csv
-import io
 import json
 
 from datasette import Response
@@ -46,43 +44,6 @@ async def api_list_fields(datasette, request, list_id: int):
     rows = await db.select_fields_for_list(list_id=list_id)
     return Response.json(
         {"list_id": list_id, "fields": [field_payload(r) for r in rows]}
-    )
-
-
-@router.GET(r"^/-/places/api/lists/(?P<list_id>\d+)/table$")
-async def api_list_table(datasette, request, list_id: int):
-    """The list's expanded SQL view as JSON (or CSV with ``?_format=csv``).
-
-    Backed by the real per-list view (``json_extract`` column per field), so it
-    exposes/exercises that view. ``view`` names it for SQL against the DB.
-    """
-    await ensure_places_view(datasette, request, list_id)
-    db = places_db(datasette)
-    pl = await db.select_list_by_id(list_id)
-    if pl is None:
-        return Response.json({"error": "List not found"}, status=404)
-
-    columns, rows = await db.select_expanded_rows(list_id=list_id)
-    view = db.expanded_view_name(list_id)
-
-    if request.args.get("_format") == "csv":
-        buf = io.StringIO()
-        writer = csv.writer(buf)
-        writer.writerow(columns)
-        writer.writerows(rows)
-        return Response(
-            buf.getvalue(),
-            content_type="text/csv; charset=utf-8",
-            headers={"content-disposition": f'attachment; filename="{view}.csv"'},
-        )
-
-    return Response.json(
-        {
-            "list_id": list_id,
-            "view": view,
-            "columns": columns,
-            "rows": [dict(zip(columns, row)) for row in rows],
-        }
     )
 
 

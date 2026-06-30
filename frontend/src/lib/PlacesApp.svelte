@@ -369,14 +369,6 @@
     <div class="stage" class:split={viewMode === "table"}>
     {#if viewMode === "table"}
       <section class="table-pane">
-        <div class="table-export">
-          <span>Export</span>
-          <a href={`/-/places/api/lists/${listId}/table?_format=csv`}>⤓ CSV</a>
-          <a href={`/-/places/api/lists/${listId}/table`} target="_blank" rel="noopener">JSON</a>
-          <code title="A SQL view in the internal database — one json_extract column per field"
-            >{`_datasette_places_list_${listId}_expanded`}</code
-          >
-        </div>
         <PlacesTable
           {places}
           {fields}
@@ -814,33 +806,6 @@
     padding-left: 368px;
     border-bottom: 1px solid #ddd;
   }
-  .table-export {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 5px 12px;
-    background: #f8f9fb;
-    border-bottom: 1px solid #e6e8eb;
-    font-size: 0.78em;
-    color: #888;
-  }
-  .table-export a {
-    color: #0b5cad;
-    text-decoration: none;
-    font-weight: 600;
-  }
-  .table-export a:hover {
-    text-decoration: underline;
-  }
-  .table-export code {
-    margin-left: auto;
-    color: #999;
-    font-size: 0.95em;
-  }
-
   /* Small, secondary toggle that matches the Fields/Share panel buttons rather
      than a big primary call-to-action. Active = subtly tinted, not filled. */
   .view-toggle-btn {

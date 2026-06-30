@@ -53,8 +53,7 @@ Place values are stored as a single JSON object in each place's
 `metadata_json`, and a per-list SQL view
 (`_datasette_places_list_<id>_expanded`) expands each field into its own column
 via `json_extract`. The same fields drive a spreadsheet-style **Table view** of
-the list, toggled from the floating panel. The table header links to **CSV** and
-**JSON** exports of that view:
+the list, toggled from the floating panel:
 
 ![The table view: one row per place, one column per custom field](docs/screenshots/table.png)
 

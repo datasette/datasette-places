@@ -347,28 +347,6 @@ class PlacesDB:
 
         return await self.database.execute_write_fn(write)
 
-    async def select_expanded_rows(
-        self, *, list_id: int
-    ) -> tuple[list[str], list[tuple]]:
-        """Read the list's expanded SQL view (one column per declared field).
-
-        Ensures the view is current first (idempotent rebuild), so a list whose
-        view was never built — e.g. it has no fields yet — still returns the base
-        columns. Returns ``(column_names, rows)``.
-        """
-
-        def read(conn):
-            _rebuild_list_artifacts(conn, list_id)
-            cur = conn.execute(f"SELECT * FROM {quote_identifier(_view_name(list_id))}")
-            cols = [d[0] for d in cur.description]
-            return cols, cur.fetchall()
-
-        return await self.database.execute_write_fn(read)
-
-    def expanded_view_name(self, list_id: int) -> str:
-        """The SQL view name for a list (for display / SQL against the DB)."""
-        return _view_name(list_id)
-
 
 # ----------------------------------------------------------------------
 # Dynamic per-list DDL (expanded view + uniqueness indexes)
