@@ -58,17 +58,30 @@ const COFFEE_FIELDS = [
   },
   { key: "instagram", label: "Instagram", type: "url" },
   { key: "wifi", label: "Wi-Fi", type: "boolean" },
+  {
+    key: "amenities",
+    label: "Amenities",
+    type: "select",
+    config: {
+      multiple: true,
+      options: [
+        { value: "patio", label: "Patio", color: "#2e7d32" },
+        { value: "pastries", label: "Pastries", color: "#b5651d" },
+        { value: "beans", label: "Beans", color: "#6f4e37" },
+      ],
+    },
+  },
 ];
 
 // A walkable downtown-Portland coffee crawl — markers cluster nicely at city
 // zoom. Each carries custom-field metadata declared in COFFEE_FIELDS.
 const COFFEE = [
-  { name: "Heart Coffee Roasters", latitude: 45.5226, longitude: -122.6587, color: "#b5651d", address: "2211 E Burnside St, Portland, OR", metadata: { rating: 5, vibe: "minimal", instagram: "https://instagram.com/heartroasters", wifi: true } },
-  { name: "Coava Coffee", latitude: 45.5152, longitude: -122.6566, color: "#6f4e37", address: "1300 SE Grand Ave, Portland, OR", metadata: { rating: 5, vibe: "minimal", instagram: "https://instagram.com/coavacoffee", wifi: true } },
-  { name: "Stumptown HQ", latitude: 45.5121, longitude: -122.6543, color: "#3b2f2f", address: "100 SE Salmon St, Portland, OR", metadata: { rating: 4, vibe: "cozy", instagram: "https://instagram.com/stumptowncoffee", wifi: false } },
-  { name: "Never Coffee", latitude: 45.5108, longitude: -122.6186, color: "#d27d2d", address: "4243 SE Belmont St, Portland, OR", metadata: { rating: 4.5, vibe: "lively", instagram: "https://instagram.com/nevercoffee", wifi: true } },
-  { name: "Good Coffee", latitude: 45.5189, longitude: -122.6411, color: "#a0522d", address: "4747 SE Division St, Portland, OR", metadata: { rating: 3.5, vibe: "cozy", instagram: "https://instagram.com/goodcoffeepdx", wifi: true } },
-  { name: "Either/Or", latitude: 45.4742, longitude: -122.6312, color: "#8b5a2b", address: "8235 SE 13th Ave, Portland, OR", metadata: { rating: 4, vibe: "lively", instagram: "https://instagram.com/eitherorcafe", wifi: false } },
+  { name: "Heart Coffee Roasters", latitude: 45.5226, longitude: -122.6587, color: "#b5651d", address: "2211 E Burnside St, Portland, OR", metadata: { rating: 5, vibe: "minimal", instagram: "https://instagram.com/heartroasters", wifi: true, amenities: ["beans", "pastries"] } },
+  { name: "Coava Coffee", latitude: 45.5152, longitude: -122.6566, color: "#6f4e37", address: "1300 SE Grand Ave, Portland, OR", metadata: { rating: 5, vibe: "minimal", instagram: "https://instagram.com/coavacoffee", wifi: true, amenities: ["beans"] } },
+  { name: "Stumptown HQ", latitude: 45.5121, longitude: -122.6543, color: "#3b2f2f", address: "100 SE Salmon St, Portland, OR", metadata: { rating: 4, vibe: "cozy", instagram: "https://instagram.com/stumptowncoffee", wifi: false, amenities: ["pastries"] } },
+  { name: "Never Coffee", latitude: 45.5108, longitude: -122.6186, color: "#d27d2d", address: "4243 SE Belmont St, Portland, OR", metadata: { rating: 4.5, vibe: "lively", instagram: "https://instagram.com/nevercoffee", wifi: true, amenities: ["patio", "pastries"] } },
+  { name: "Good Coffee", latitude: 45.5189, longitude: -122.6411, color: "#a0522d", address: "4747 SE Division St, Portland, OR", metadata: { rating: 3.5, vibe: "cozy", instagram: "https://instagram.com/goodcoffeepdx", wifi: true, amenities: ["patio"] } },
+  { name: "Either/Or", latitude: 45.4742, longitude: -122.6312, color: "#8b5a2b", address: "8235 SE 13th Ave, Portland, OR", metadata: { rating: 4, vibe: "lively", instagram: "https://instagram.com/eitherorcafe", wifi: false, amenities: ["patio", "beans"] } },
 ];
 
 const HIKES = [

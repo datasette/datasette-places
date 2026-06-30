@@ -13,7 +13,7 @@
  * list yields `denied`/`not_found` with no name or data leaked.
  */
 import { mount, unmount } from "svelte";
-import MapView from "../../lib/MapView.svelte";
+import EmbedMap from "../../lib/EmbedMap.svelte";
 import type { Field, MetaValue } from "../../lib/fields";
 import "leaflet/dist/leaflet.css";
 
@@ -29,44 +29,29 @@ function listIdFromRef(ref: string): number | null {
 const GLOBE_ICON =
   '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m7.5-6.923c-.67.204-1.335.82-1.887 1.855A8 8 0 0 0 5.145 4H7.5zM4.09 4a9.3 9.3 0 0 1 .64-1.539 7 7 0 0 1 .597-.933A7.03 7.03 0 0 0 2.255 4zm-.582 3.5c.03-.877.138-1.718.312-2.5H1.674a7 7 0 0 0-.656 2.5zM4.847 5a12.5 12.5 0 0 0-.338 2.5H7.5V5zM8.5 5v2.5h2.99a12.5 12.5 0 0 0-.337-2.5zM4.51 8.5a12.5 12.5 0 0 0 .337 2.5H7.5V8.5zm3.99 0V11h2.653c.187-.765.306-1.608.338-2.5zM5.145 12q.208.58.468 1.068c.552 1.035 1.218 1.65 1.887 1.855V12zm.182 2.472a7 7 0 0 1-.597-.933A9.3 9.3 0 0 1 4.09 12H2.255a7 7 0 0 0 3.072 2.472M3.82 11a13.7 13.7 0 0 1-.312-2.5h-2.49c.062.89.291 1.733.656 2.5zm6.853 3.472A7 7 0 0 0 13.745 12H11.91a9.3 9.3 0 0 1-.64 1.539 7 7 0 0 1-.597.933M8.5 12v2.923c.67-.204 1.335-.82 1.887-1.855q.26-.487.468-1.068zm3.68-1h2.146c.365-.767.594-1.61.656-2.5h-2.49a13.7 13.7 0 0 1-.312 2.5m2.802-3.5a7 7 0 0 0-.656-2.5H12.18c.174.782.282 1.623.312 2.5zM11.27 2.461q.337.708.582 1.539h1.835a7 7 0 0 0-3.072-2.472q.327.482.655 1.348zM10.855 4a8 8 0 0 0-.468-1.068C9.835 1.897 9.17 1.282 8.5 1.077V4z"/></svg>';
 
-type PlacePin = {
+type Place = {
   id: number;
+  list_id: number;
   name: string;
   address: string | null;
   latitude: number;
   longitude: number;
-  color: string;
-  shape: string;
+  notes: string | null;
+  color: string | null;
   metadata: Record<string, MetaValue> | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
-/** Fetch + map the list's places into MapView pins (read-only). */
-async function fetchPins(listId: number): Promise<PlacePin[]> {
+/** Fetch the list's full place objects (read-only) for the map + table. */
+async function fetchPlaces(listId: number): Promise<Place[]> {
   const resp = await fetch(`/-/places/api/lists/${listId}/places`, {
     headers: { "Content-Type": "application/json" },
   });
   if (!resp.ok) throw new Error(`places ${resp.status}`);
-  const data = (await resp.json()) as {
-    places?: Array<{
-      id: number;
-      name: string;
-      address: string | null;
-      latitude: number;
-      longitude: number;
-      color: string | null;
-      metadata?: Record<string, MetaValue> | null;
-    }>;
-  };
-  return (data.places ?? []).map((p) => ({
-    id: p.id,
-    name: p.name,
-    address: p.address ?? null,
-    latitude: p.latitude,
-    longitude: p.longitude,
-    color: p.color || "#3b82f6",
-    shape: (p.metadata?.shape as string) || "pin",
-    metadata: p.metadata ?? null,
-  }));
+  const data = (await resp.json()) as { places?: Place[] };
+  return data.places ?? [];
 }
 
 /** The list's custom field definitions, so embed popups show their values.
@@ -100,12 +85,12 @@ class DatasettePlacesMap extends HTMLElement {
   }
 
   private async renderMap(listId: number): Promise<void> {
-    let places: PlacePin[];
+    let places: Place[];
     let fields: Field[];
     try {
       // Fields are best-effort (fetchFields never rejects); places are required.
       [places, fields] = await Promise.all([
-        fetchPins(listId),
+        fetchPlaces(listId),
         fetchFields(listId),
       ]);
     } catch {
@@ -113,9 +98,9 @@ class DatasettePlacesMap extends HTMLElement {
       return;
     }
     if (!this.isConnected) return; // unmounted while fetching
-    this.app = mount(MapView, {
+    this.app = mount(EmbedMap, {
       target: this,
-      props: { places, fields, selectedId: null, previewPin: null, canEdit: false },
+      props: { places, fields, listId },
     });
   }
 

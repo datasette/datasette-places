@@ -220,6 +220,10 @@
     border-collapse: collapse;
     font-size: 0.88em;
     min-width: 100%;
+    /* Override datasette-paper's `.ProseMirror table { table-layout: fixed }`
+       when this table is shown inside a block embed — without this, columns get
+       equal fixed widths and long names overflow into the next column. */
+    table-layout: auto !important;
   }
   thead th {
     position: sticky;

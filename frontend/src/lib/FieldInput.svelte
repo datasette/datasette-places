@@ -17,6 +17,16 @@
   let hasRating = $derived(Number(value) > 0);
   let options = $derived(field.config?.options ?? []);
 
+  // Multi-value select: value is an array of option values; toggle membership.
+  let selected = $derived(new Set(Array.isArray(value) ? value : []));
+  function toggleMulti(v: string) {
+    const cur = Array.isArray(value) ? [...value] : [];
+    const i = cur.indexOf(v);
+    if (i >= 0) cur.splice(i, 1);
+    else cur.push(v);
+    value = cur.length ? cur : undefined;
+  }
+
   // Click the left half of a star for x.5, the right half for a whole star;
   // clicking the current value again clears it.
   function setRating(v: number) {
@@ -55,6 +65,19 @@
     {#if hasRating}
       <button type="button" class="fi-clear" title="Clear" onclick={() => (value = undefined)}>×</button>
     {/if}
+  </span>
+{:else if field.type === "select" && field.config?.multiple}
+  <span class="fi-multi" role="group" aria-label={field.label}>
+    {#each options as o}
+      <label class="fi-check" style={o.color ? `--chip:${o.color}` : ""}>
+        <input
+          type="checkbox"
+          checked={selected.has(o.value)}
+          onchange={() => toggleMulti(o.value)}
+        />
+        {o.label}
+      </label>
+    {/each}
   </span>
 {:else if field.type === "select"}
   <select bind:value onkeydown={onKey}>
@@ -146,6 +169,21 @@
     border: 1px solid #ccc;
     border-radius: 3px;
     cursor: pointer;
+  }
+  .fi-multi {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .fi-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.9em;
+    cursor: pointer;
+  }
+  .fi-check input {
+    accent-color: var(--chip, #0b5cad);
   }
   .fi-icon {
     display: flex;

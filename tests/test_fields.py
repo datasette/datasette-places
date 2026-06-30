@@ -200,6 +200,45 @@ async def test_toggle_unique_off_drops_index(ds):
     assert _idx_count(rows) == 0
 
 
+# --- Expanded view export endpoint -------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_table_endpoint_json_and_csv(ds):
+    list_id = await _create_list(ds)
+    await _add_field(ds, list_id, key="rating", label="Rating", type="rating")
+    await _add_field(ds, list_id, key="cuisine", label="Cuisine", type="text")
+    await _add_place(
+        ds, list_id, name="Thai Place", metadata={"rating": 4, "cuisine": "thai"}
+    )
+
+    resp = await ds.client.get(f"/-/places/api/lists/{list_id}/table")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["view"] == f"_datasette_places_list_{list_id}_expanded"
+    assert "rating" in data["columns"] and "cuisine" in data["columns"]
+    assert data["rows"][0]["rating"] == 4
+    assert data["rows"][0]["cuisine"] == "thai"
+    assert data["rows"][0]["name"] == "Thai Place"
+
+    csv_resp = await ds.client.get(f"/-/places/api/lists/{list_id}/table?_format=csv")
+    assert csv_resp.status_code == 200
+    assert "text/csv" in csv_resp.headers["content-type"]
+    body = csv_resp.text
+    assert "rating" in body.splitlines()[0]
+    assert "Thai Place" in body
+
+
+@pytest.mark.asyncio
+async def test_table_endpoint_no_fields(ds):
+    # A list that never had fields still returns base columns (view built lazily).
+    list_id = await _create_list(ds)
+    await _add_place(ds, list_id, name="A")
+    resp = await ds.client.get(f"/-/places/api/lists/{list_id}/table")
+    assert resp.status_code == 200
+    assert "name" in resp.json()["columns"]
+
+
 # --- Value validation on places ----------------------------------------------
 
 
