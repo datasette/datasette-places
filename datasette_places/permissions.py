@@ -44,6 +44,23 @@ PLACES_LIST_ACTIONS = (ACTION_VIEW, ACTION_EDIT, ACTION_MANAGE)
 # plugin, not acl).
 ACTION_LIST = "datasette-places-list"
 ACTION_CREATE = "datasette-places-create"
+# Admin of geocoder *instances* (create/edit/delete the named geocoders
+# themselves). Config-driven and global, like list/create above. Sharing an
+# instance with users/groups is a per-instance acl grant, not this.
+ACTION_GEOCODER_ADMIN = "datasette-places-geocoder-admin"
+
+
+# --- Geocoder instances: acl-backed resource type ---------------------------
+# A geocoder instance is ACL'd the same way a list is: a parent-only acl
+# resource (parent = the geocoder slug) with use/manage actions resolved by
+# datasette-acl. "Anyone can add OpenCage" == geocoder-use granted to everyone;
+# "only A/B/C can add the LA geocoder" == geocoder-use granted to A/B/C.
+PLACES_GEOCODER_RESOURCE_TYPE = "places-geocoder"
+
+ACTION_GEOCODER_USE = "geocoder-use"
+ACTION_GEOCODER_MANAGE = "geocoder-manage"
+
+PLACES_GEOCODER_ACTIONS = (ACTION_GEOCODER_USE, ACTION_GEOCODER_MANAGE)
 
 
 class PlacesListResource(Resource):
@@ -69,6 +86,87 @@ class PlacesListResource(Resource):
             "SELECT CAST(id AS TEXT) AS parent, NULL AS child "
             "FROM _datasette_places_list"
         )
+
+
+class PlacesGeocoderResource(Resource):
+    """A single geocoder instance, acl-backed (resource type ``places-geocoder``).
+
+    Parent-only: the geocoder slug is the ``parent``, ``child`` is ``None``. The
+    ``geocoder-use`` / ``geocoder-manage`` actions resolve against acl grants on
+    this resource, mirroring :class:`PlacesListResource`.
+    """
+
+    name = PLACES_GEOCODER_RESOURCE_TYPE
+    parent_class = None
+
+    def __init__(self, geocoder_id):
+        super().__init__(parent=str(geocoder_id), child=None)
+
+    @classmethod
+    async def resources_sql(cls, datasette, actor=None) -> str:
+        return "SELECT id AS parent, NULL AS child FROM _datasette_places_geocoder"
+
+
+async def seed_geocoder_manager_grant(datasette, geocoder_id, created_by) -> None:
+    """Grant the geocoder creator the Manager role on the new instance.
+
+    Mirrors :func:`seed_owner_manager_grant` for lists. No-op for anonymous
+    creates (``created_by`` falsy).
+    """
+    if not created_by:
+        return
+    await _acl_grant(
+        datasette,
+        PLACES_GEOCODER_RESOURCE_TYPE,
+        str(geocoder_id),
+        principal=_Principal.actor(str(created_by)),
+        role="Manager",
+        by_actor=str(created_by),
+    )
+
+
+async def grant_geocoder_use_everyone(datasette, geocoder_id, by_actor=None) -> None:
+    """Make a geocoder public: grant ``geocoder-use`` to the everyone audience."""
+    await _acl_grant(
+        datasette,
+        PLACES_GEOCODER_RESOURCE_TYPE,
+        str(geocoder_id),
+        principal=_Principal.everyone(),
+        actions=[ACTION_GEOCODER_USE],
+        by_actor=by_actor,
+    )
+
+
+async def grant_geocoder_use_actor(
+    datasette, geocoder_id, actor_id, *, by_actor=None
+) -> None:
+    """Grant a single actor the User role (``geocoder-use``) on a geocoder."""
+    await _acl_grant(
+        datasette,
+        PLACES_GEOCODER_RESOURCE_TYPE,
+        str(geocoder_id),
+        principal=_Principal.actor(str(actor_id)),
+        role="User",
+        by_actor=by_actor or "config-seed",
+    )
+
+
+async def can_geocoder_use(datasette, actor, geocoder_id) -> bool:
+    """True when ``actor`` may use (and attach) the geocoder."""
+    return await datasette.allowed(
+        action=ACTION_GEOCODER_USE,
+        resource=PlacesGeocoderResource(geocoder_id),
+        actor=actor,
+    )
+
+
+async def can_geocoder_manage(datasette, actor, geocoder_id) -> bool:
+    """True when ``actor`` may manage sharing for the geocoder."""
+    return await datasette.allowed(
+        action=ACTION_GEOCODER_MANAGE,
+        resource=PlacesGeocoderResource(geocoder_id),
+        actor=actor,
+    )
 
 
 async def seed_owner_manager_grant(datasette, list_id, created_by) -> None:

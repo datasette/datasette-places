@@ -44,6 +44,42 @@ class Place:
     updated_at: str
 
 
+@dataclass
+class Geocoder:
+    id: str
+    provider_type: str
+    label: str
+    config_json: str
+    enabled: int
+    created_by: str | None
+    created_at: str
+    updated_at: str
+
+
+@dataclass
+class ListGeocoder:
+    list_id: int
+    geocoder_id: str
+    enabled: int
+    is_default: int
+    position: int
+    added_by: str | None
+    added_at: str
+
+
+@dataclass
+class ListGeocoderRow:
+    list_id: int
+    geocoder_id: str
+    enabled: int
+    is_default: int
+    position: int
+    provider_type: str
+    label: str
+    config_json: str
+    geocoder_enabled: int
+
+
 def insert_list(
     conn: sqlite3.Connection, name: str, created_by: str | None
 ) -> PlaceList | None:
@@ -284,5 +320,214 @@ RETURNING id, list_id, name, address, latitude, longitude, notes, color, metadat
 def delete_place(conn: sqlite3.Connection, place_id: int) -> None:
     sql = "DELETE FROM _datasette_places_place WHERE id = $place_id::integer;"
     params = {"place_id::integer": place_id}
+    conn.execute(sql, params)
+    return None
+
+
+def insert_geocoder(
+    conn: sqlite3.Connection,
+    id: str,
+    provider_type: str,
+    label: str,
+    config_json: str,
+    enabled: int,
+    created_by: str | None,
+) -> Geocoder | None:
+    sql = """\
+INSERT INTO _datasette_places_geocoder (id, provider_type, label, config_json, enabled, created_by)
+VALUES ($id::text, $provider_type::text, $label::text, $config_json::text, $enabled::integer, $created_by::text::)
+RETURNING id, provider_type, label, config_json, enabled, created_by, created_at, updated_at;
+"""
+    params = {
+        "id::text": id,
+        "provider_type::text": provider_type,
+        "label::text": label,
+        "config_json::text": config_json,
+        "enabled::integer": enabled,
+        "created_by::text::": created_by,
+    }
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return Geocoder(*row) if row is not None else None
+
+
+def select_geocoder_by_id(conn: sqlite3.Connection, id: str) -> Geocoder | None:
+    sql = """\
+SELECT id, provider_type, label, config_json, enabled, created_by, created_at, updated_at
+FROM _datasette_places_geocoder
+WHERE id = $id::text;
+"""
+    params = {"id::text": id}
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return Geocoder(*row) if row is not None else None
+
+
+def list_geocoders(conn: sqlite3.Connection) -> list[Geocoder]:
+    sql = """\
+SELECT id, provider_type, label, config_json, enabled, created_by, created_at, updated_at
+FROM _datasette_places_geocoder
+ORDER BY label COLLATE NOCASE ASC;
+"""
+    params: dict[str, Any] = {}
+    cursor = conn.execute(sql, params)
+    return [Geocoder(*row) for row in cursor.fetchall()]
+
+
+def list_geocoders_by_ids(conn: sqlite3.Connection, ids_json: str) -> list[Geocoder]:
+    sql = """\
+SELECT g.id, g.provider_type, g.label, g.config_json, g.enabled, g.created_by, g.created_at, g.updated_at
+FROM _datasette_places_geocoder g
+JOIN json_each($ids_json::text) je ON je.value = g.id
+ORDER BY g.label COLLATE NOCASE ASC;
+"""
+    params = {"ids_json::text": ids_json}
+    cursor = conn.execute(sql, params)
+    return [Geocoder(*row) for row in cursor.fetchall()]
+
+
+def update_geocoder(
+    conn: sqlite3.Connection, label: str, config_json: str, enabled: int, id: str
+) -> Geocoder | None:
+    sql = """\
+UPDATE _datasette_places_geocoder
+SET label = $label::text,
+    config_json = $config_json::text,
+    enabled = $enabled::integer,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+WHERE id = $id::text
+RETURNING id, provider_type, label, config_json, enabled, created_by, created_at, updated_at;
+"""
+    params = {
+        "label::text": label,
+        "config_json::text": config_json,
+        "enabled::integer": enabled,
+        "id::text": id,
+    }
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return Geocoder(*row) if row is not None else None
+
+
+def delete_geocoder(conn: sqlite3.Connection, id: str) -> None:
+    sql = "DELETE FROM _datasette_places_geocoder WHERE id = $id::text;"
+    params = {"id::text": id}
+    conn.execute(sql, params)
+    return None
+
+
+def attach_geocoder_to_list(
+    conn: sqlite3.Connection, list_id: int, geocoder_id: str, added_by: str | None
+) -> ListGeocoder | None:
+    sql = """\
+INSERT INTO _datasette_places_list_geocoder (list_id, geocoder_id, enabled, is_default, position, added_by)
+VALUES ($list_id::integer, $geocoder_id::text, 1, 0,
+        (SELECT COALESCE(MAX(position), -1) + 1 FROM _datasette_places_list_geocoder WHERE list_id = $list_id::integer),
+        $added_by::text::)
+ON CONFLICT (list_id, geocoder_id) DO UPDATE SET enabled = 1
+RETURNING list_id, geocoder_id, enabled, is_default, position, added_by, added_at;
+"""
+    params = {
+        "list_id::integer": list_id,
+        "geocoder_id::text": geocoder_id,
+        "added_by::text::": added_by,
+    }
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return ListGeocoder(*row) if row is not None else None
+
+
+def select_list_geocoder(
+    conn: sqlite3.Connection, list_id: int, geocoder_id: str
+) -> ListGeocoder | None:
+    sql = """\
+SELECT list_id, geocoder_id, enabled, is_default, position, added_by, added_at
+FROM _datasette_places_list_geocoder
+WHERE list_id = $list_id::integer AND geocoder_id = $geocoder_id::text;
+"""
+    params = {"list_id::integer": list_id, "geocoder_id::text": geocoder_id}
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return ListGeocoder(*row) if row is not None else None
+
+
+def list_geocoders_for_list(
+    conn: sqlite3.Connection, list_id: int
+) -> list[ListGeocoderRow]:
+    sql = """\
+SELECT lg.list_id, lg.geocoder_id, lg.enabled, lg.is_default, lg.position,
+       g.provider_type, g.label, g.config_json, g.enabled AS geocoder_enabled
+FROM _datasette_places_list_geocoder lg
+JOIN _datasette_places_geocoder g ON g.id = lg.geocoder_id
+WHERE lg.list_id = $list_id::integer
+ORDER BY lg.position ASC, g.label COLLATE NOCASE ASC;
+"""
+    params = {"list_id::integer": list_id}
+    cursor = conn.execute(sql, params)
+    return [ListGeocoderRow(*row) for row in cursor.fetchall()]
+
+
+def default_geocoder_for_list(conn: sqlite3.Connection, list_id: int) -> str | None:
+    sql = """\
+SELECT geocoder_id
+FROM _datasette_places_list_geocoder
+WHERE list_id = $list_id::integer AND is_default = 1 AND enabled = 1
+LIMIT 1;
+"""
+    params = {"list_id::integer": list_id}
+    cursor = conn.execute(sql, params)
+    row = cursor.fetchone()
+    return row[0] if row is not None else None
+
+
+def set_list_geocoder_enabled(
+    conn: sqlite3.Connection, enabled: int, list_id: int, geocoder_id: str
+) -> None:
+    sql = """\
+UPDATE _datasette_places_list_geocoder
+SET enabled = $enabled::integer
+WHERE list_id = $list_id::integer AND geocoder_id = $geocoder_id::text;
+"""
+    params = {
+        "enabled::integer": enabled,
+        "list_id::integer": list_id,
+        "geocoder_id::text": geocoder_id,
+    }
+    conn.execute(sql, params)
+    return None
+
+
+def clear_list_geocoder_default(conn: sqlite3.Connection, list_id: int) -> None:
+    sql = """\
+UPDATE _datasette_places_list_geocoder
+SET is_default = 0
+WHERE list_id = $list_id::integer;
+"""
+    params = {"list_id::integer": list_id}
+    conn.execute(sql, params)
+    return None
+
+
+def set_list_geocoder_default(
+    conn: sqlite3.Connection, list_id: int, geocoder_id: str
+) -> None:
+    sql = """\
+UPDATE _datasette_places_list_geocoder
+SET is_default = 1
+WHERE list_id = $list_id::integer AND geocoder_id = $geocoder_id::text;
+"""
+    params = {"list_id::integer": list_id, "geocoder_id::text": geocoder_id}
+    conn.execute(sql, params)
+    return None
+
+
+def detach_geocoder_from_list(
+    conn: sqlite3.Connection, list_id: int, geocoder_id: str
+) -> None:
+    sql = """\
+DELETE FROM _datasette_places_list_geocoder
+WHERE list_id = $list_id::integer AND geocoder_id = $geocoder_id::text;
+"""
+    params = {"list_id::integer": list_id, "geocoder_id::text": geocoder_id}
     conn.execute(sql, params)
     return None

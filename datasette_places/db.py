@@ -16,9 +16,22 @@ import json
 from typing import Optional
 
 from .sql import queries_generated as _queries
-from .sql.queries_generated import Place, PlaceList  # re-exported for callers
+from .sql.queries_generated import (  # re-exported for callers
+    Geocoder,
+    ListGeocoder,
+    ListGeocoderRow,
+    Place,
+    PlaceList,
+)
 
-__all__ = ["PlacesDB", "Place", "PlaceList"]
+__all__ = [
+    "PlacesDB",
+    "Place",
+    "PlaceList",
+    "Geocoder",
+    "ListGeocoder",
+    "ListGeocoderRow",
+]
 
 
 class PlacesDB:
@@ -198,3 +211,146 @@ class PlacesDB:
             return True
 
         return await self.database.execute_write_fn(write)
+
+    # ------------------------------------------------------------------
+    # Geocoder instances
+    # ------------------------------------------------------------------
+
+    async def insert_geocoder(
+        self,
+        *,
+        id: str,
+        provider_type: str,
+        label: str,
+        config_json: str = "{}",
+        enabled: bool = True,
+        created_by: Optional[str] = None,
+    ) -> Geocoder:
+        def write(conn):
+            return _queries.insert_geocoder(
+                conn,
+                id=id,
+                provider_type=provider_type,
+                label=label,
+                config_json=config_json,
+                enabled=1 if enabled else 0,
+                created_by=created_by,
+            )
+
+        g = await self.database.execute_write_fn(write)
+        assert g is not None
+        return g
+
+    async def select_geocoder_by_id(self, geocoder_id: str) -> Optional[Geocoder]:
+        def read(conn):
+            return _queries.select_geocoder_by_id(conn, id=geocoder_id)
+
+        return await self.database.execute_write_fn(read)
+
+    async def list_geocoders(self) -> list[Geocoder]:
+        def read(conn):
+            return _queries.list_geocoders(conn)
+
+        return await self.database.execute_write_fn(read)
+
+    async def list_geocoders_by_ids(self, geocoder_ids: list[str]) -> list[Geocoder]:
+        ids_json = json.dumps(geocoder_ids)
+
+        def read(conn):
+            return _queries.list_geocoders_by_ids(conn, ids_json=ids_json)
+
+        return await self.database.execute_write_fn(read)
+
+    async def update_geocoder(
+        self, *, geocoder_id: str, label: str, config_json: str, enabled: bool
+    ) -> Optional[Geocoder]:
+        def write(conn):
+            return _queries.update_geocoder(
+                conn,
+                label=label,
+                config_json=config_json,
+                enabled=1 if enabled else 0,
+                id=geocoder_id,
+            )
+
+        return await self.database.execute_write_fn(write)
+
+    async def delete_geocoder(self, *, geocoder_id: str) -> None:
+        def write(conn):
+            _queries.delete_geocoder(conn, id=geocoder_id)
+
+        await self.database.execute_write_fn(write)
+
+    # ------------------------------------------------------------------
+    # Per-list geocoder attachments
+    # ------------------------------------------------------------------
+
+    async def attach_geocoder_to_list(
+        self, *, list_id: int, geocoder_id: str, added_by: Optional[str] = None
+    ) -> ListGeocoder:
+        def write(conn):
+            return _queries.attach_geocoder_to_list(
+                conn, list_id=list_id, geocoder_id=geocoder_id, added_by=added_by
+            )
+
+        lg = await self.database.execute_write_fn(write)
+        assert lg is not None
+        return lg
+
+    async def select_list_geocoder(
+        self, *, list_id: int, geocoder_id: str
+    ) -> Optional[ListGeocoder]:
+        def read(conn):
+            return _queries.select_list_geocoder(
+                conn, list_id=list_id, geocoder_id=geocoder_id
+            )
+
+        return await self.database.execute_write_fn(read)
+
+    async def list_geocoders_for_list(self, *, list_id: int) -> list[ListGeocoderRow]:
+        def read(conn):
+            return _queries.list_geocoders_for_list(conn, list_id=list_id)
+
+        return await self.database.execute_write_fn(read)
+
+    async def default_geocoder_for_list(self, *, list_id: int) -> Optional[str]:
+        def read(conn):
+            return _queries.default_geocoder_for_list(conn, list_id=list_id)
+
+        return await self.database.execute_write_fn(read)
+
+    async def set_list_geocoder_enabled(
+        self, *, list_id: int, geocoder_id: str, enabled: bool
+    ) -> None:
+        def write(conn):
+            _queries.set_list_geocoder_enabled(
+                conn,
+                enabled=1 if enabled else 0,
+                list_id=list_id,
+                geocoder_id=geocoder_id,
+            )
+
+        await self.database.execute_write_fn(write)
+
+    async def set_list_geocoder_default(
+        self, *, list_id: int, geocoder_id: str
+    ) -> None:
+        """Make ``geocoder_id`` the sole default for the list (atomic)."""
+
+        def write(conn):
+            _queries.clear_list_geocoder_default(conn, list_id=list_id)
+            _queries.set_list_geocoder_default(
+                conn, list_id=list_id, geocoder_id=geocoder_id
+            )
+
+        await self.database.execute_write_fn(write)
+
+    async def detach_geocoder_from_list(
+        self, *, list_id: int, geocoder_id: str
+    ) -> None:
+        def write(conn):
+            _queries.detach_geocoder_from_list(
+                conn, list_id=list_id, geocoder_id=geocoder_id
+            )
+
+        await self.database.execute_write_fn(write)
