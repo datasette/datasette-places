@@ -3,7 +3,13 @@
   import MapView from "./MapView.svelte";
   import AddressSearch from "./AddressSearch.svelte";
   import PlacesList from "./PlacesList.svelte";
-  import ShareDialog from "./ShareDialog.svelte";
+  // The <datasette-acl-share-dialog> custom element is registered by the
+  // datasette-acl-share JS bundle, which places' extra_js_urls hook includes on
+  // the list page — no component import needed here.
+
+  // acl resource identity for a place list: type "places-list", a parent-only
+  // resource whose parent is the list id (child omitted).
+  const SHARE_RESOURCE_TYPE = "places-list";
 
   type Place = {
     id: number;
@@ -32,7 +38,6 @@
     name: string;
     description: string | null;
     created_by: string | null;
-    visibility: string;
     state: string;
     place_count: number;
     updated_at: string;
@@ -44,7 +49,13 @@
     };
   };
 
-  let { listId }: { listId: number } = $props();
+  let {
+    listId,
+    actor = null,
+  }: {
+    listId: number;
+    actor?: { id: string } | null;
+  } = $props();
 
   let listDetail = $state<ListDetail | null>(null);
   let places = $state<Place[]>([]);
@@ -55,7 +66,6 @@
   let saving = $state(false);
   let editingName = $state(false);
   let editNameValue = $state("");
-  let shareOpen = $state(false);
   let editingDesc = $state(false);
   let editDescValue = $state("");
   let geocodingClick = $state(false);
@@ -68,6 +78,11 @@
   }
 
   let canEdit = $derived(listDetail?.permissions?.canEdit ?? false);
+  // Share is gated on the acl manage capability (the owner gets it via the
+  // seeded Manager grant) rather than ownership of the row.
+  let canManage = $derived(listDetail?.permissions?.canManage ?? false);
+  // actor-json the dialog reads to mark the current user's row "(you)".
+  let actorJson = $derived(actor ? JSON.stringify(actor) : "");
 
   function relativeTime(iso: string): string {
     const t = Date.parse(iso);
@@ -365,14 +380,22 @@
               <h1>{listDetail.name}</h1>
             {/if}
           {/if}
-          {#if listDetail.permissions.isOwner}
-            <button
-              type="button"
-              class="share-btn"
-              onclick={() => { shareOpen = true; }}
-            >
-              Share
-            </button>
+          {#if canManage}
+            <!-- The <datasette-acl-share-dialog> custom element (registered by the
+                 datasette-acl-share bundle) is self-contained: it renders its OWN
+                 trigger button + dialog and talks to the acl JSON API directly. We
+                 render it inline as the Share button (trigger-label="Share") rather
+                 than wrapping it in a second modal. places is parent-only: parent =
+                 list id, no child. -->
+            <datasette-acl-share-dialog
+              class="share-dialog"
+              resource-type={SHARE_RESOURCE_TYPE}
+              parent={String(listId)}
+              resource-label={listDetail.name ?? ""}
+              actor-json={actorJson}
+              trigger-label="Share"
+              features="people,groups,agents,public"
+            ></datasette-acl-share-dialog>
           {/if}
         </div>
 
@@ -422,11 +445,6 @@
         onUpdatePlace={onUpdatePlace}
       />
     </aside>
-    <ShareDialog
-      {listId}
-      open={shareOpen}
-      onClose={() => { shareOpen = false; }}
-    />
   {/if}
 </div>
 
@@ -499,16 +517,13 @@
     border-radius: 3px;
     outline: none;
   }
-  .share-btn {
-    font: inherit;
-    font-size: 0.85em;
-    padding: 4px 14px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background: #fff;
-    cursor: pointer;
+  /* The <datasette-acl-share-dialog> custom element ships its own trigger +
+     dialog styles (light DOM, datasette-acl-share-* prefixed). We only nudge
+     the inline trigger to sit nicely next to the title. */
+  .share-dialog {
+    display: inline-flex;
+    align-items: center;
   }
-  .share-btn:hover { background: #f0f4f8; }
   .error-inline {
     background: #ffd6d6;
     color: #5a0000;

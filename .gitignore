@@ -16,6 +16,9 @@ datasette_places/manifest.json
 # Frontend generated types
 frontend/api.d.ts
 
+# solite codegen IR (intermediate artifact; queries.generated.py is the output)
+datasette_places/sql/queries.sql.json
+
 # IDE
 .vscode/
 .idea/

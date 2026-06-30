@@ -4,11 +4,16 @@ from datasette import Forbidden, Response
 
 from ..router import router
 from ..permissions import (
-    PlacesResource,
+    ACTION_EDIT,
+    ACTION_MANAGE,
+    ACTION_VIEW,
+    PlacesListResource,
+    can_places_manage,
     ensure_places_create,
     ensure_places_edit,
     ensure_places_list,
     ensure_places_view,
+    seed_owner_manager_grant,
 )
 from ..util import read_json_body, actor_id, places_db
 
@@ -23,7 +28,7 @@ async def api_list_lists(datasette, request):
         )
 
     page = await datasette.allowed_resources(
-        action="datasette-places-view", actor=request.actor, limit=1000
+        action=ACTION_VIEW, actor=request.actor, limit=1000
     )
     list_ids = [int(r.parent) for r in page.resources]
     db = places_db(datasette)
@@ -38,7 +43,6 @@ async def api_list_lists(datasette, request):
                 "place_count": counts.get(r.id, 0),
                 "created_by": r.created_by,
                 "updated_at": r.updated_at,
-                "visibility": r.visibility,
                 "state": r.state,
                 "is_owner": r.created_by is not None and r.created_by == me,
             }
@@ -54,6 +58,9 @@ async def api_create_list(datasette, request):
     body = await read_json_body(request)
     name = (body.get("name") or "").strip() or "Untitled"
     pl = await db.insert_list(name=name, created_by=actor_id(request))
+    # Ownership is now an acl Manager grant on the new list rather than a
+    # created_by-based SQL rule.
+    await seed_owner_manager_grant(datasette, pl.id, pl.created_by)
     return Response.json(
         {
             "id": pl.id,
@@ -76,24 +83,24 @@ async def api_get_list(datasette, request, list_id: int):
     me = actor_id(request)
     is_owner = pl.created_by is not None and pl.created_by == me
     can_edit = await datasette.allowed(
-        action="datasette-places-edit",
-        resource=PlacesResource(list_id),
+        action=ACTION_EDIT,
+        resource=PlacesListResource(list_id),
         actor=request.actor,
     )
+    can_manage = await can_places_manage(datasette, request.actor, list_id)
     return Response.json(
         {
             "id": pl.id,
             "name": pl.name,
             "description": pl.description,
             "created_by": pl.created_by,
-            "visibility": pl.visibility,
             "state": pl.state,
             "place_count": count,
             "updated_at": pl.updated_at,
             "permissions": {
                 "canView": True,
                 "canEdit": can_edit,
-                "canManage": is_owner,
+                "canManage": can_manage,
                 "isOwner": is_owner,
             },
         }
@@ -131,15 +138,19 @@ async def api_describe_list(datasette, request, list_id: int):
 
 
 async def _ensure_owner(datasette, request, list_id: int):
-    """View-permission check then escalate to owner-only."""
+    """View-permission check then escalate to manage (owner-only) capability.
+
+    Trash / restore are now gated by the acl ``places-manage`` capability (the
+    owner gets it via the seeded Manager grant) rather than a created_by-equality
+    check.
+    """
     await ensure_places_view(datasette, request, list_id)
     db = places_db(datasette)
     pl = await db.select_list_by_id(list_id)
     if pl is None:
         return None
-    me = actor_id(request)
-    if pl.created_by is None or pl.created_by != me:
-        raise Forbidden("datasette-places-manage")
+    if not await can_places_manage(datasette, request.actor, list_id):
+        raise Forbidden(ACTION_MANAGE)
     return pl
 
 
@@ -197,7 +208,12 @@ async def places_list_page(datasette, request, list_id: int):
             {
                 "page_title": pl.name or f"Places {list_id}",
                 "entrypoint": "src/pages/list/main.ts",
-                "page_data": {"list_id": list_id},
+                # actor is surfaced so the embedded <datasette-acl-share-dialog> can
+                # mark the current user's row "(you)".
+                "page_data": {
+                    "list_id": list_id,
+                    "actor": request.actor,
+                },
             },
             request=request,
         )

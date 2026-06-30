@@ -15,16 +15,20 @@ async def ensure_migrations(database) -> None:
 
 @migrations()
 def m001_initial(db: Database):
+    # Per-list access lives entirely in datasette-acl grants on the
+    # ``places-list`` resource (see datasette_places.permissions); the schema
+    # carries no owner/shared/visibility columns. ``created_by`` is retained
+    # only to seed the creator's Manager grant on create.
     db.executescript(
         """
         CREATE TABLE IF NOT EXISTS _datasette_places_list (
-            id         INTEGER PRIMARY KEY NOT NULL,
-            name       TEXT NOT NULL,
-            created_by TEXT,
-            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-            visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','link-view','link-edit')),
-            state      TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('active','trashed'))
+            id          INTEGER PRIMARY KEY NOT NULL,
+            name        TEXT NOT NULL,
+            created_by  TEXT,
+            created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            state       TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('active','trashed')),
+            description TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_places_list_owner
             ON _datasette_places_list(created_by);
@@ -47,22 +51,5 @@ def m001_initial(db: Database):
         );
         CREATE INDEX IF NOT EXISTS idx_places_place_list
             ON _datasette_places_place(list_id);
-
-        CREATE TABLE IF NOT EXISTS _datasette_places_share (
-            list_id    INTEGER NOT NULL REFERENCES _datasette_places_list(id) ON DELETE CASCADE,
-            actor_id   TEXT NOT NULL,
-            role       TEXT NOT NULL CHECK (role IN ('viewer','editor')),
-            granted_by TEXT,
-            granted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-            PRIMARY KEY (list_id, actor_id)
-        );
-        CREATE INDEX IF NOT EXISTS idx_places_share_actor
-            ON _datasette_places_share(actor_id);
         """
     )
-
-
-@migrations()
-def m002_list_description(db: Database):
-    # A free-text description shown under the list title.
-    db.execute("ALTER TABLE _datasette_places_list ADD COLUMN description TEXT")
