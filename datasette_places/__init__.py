@@ -3,33 +3,47 @@ from collections import defaultdict
 
 from datasette import hookimpl, Response
 from datasette.permissions import Action
+from datasette.plugins import pm
 from datasette_vite import vite_entry
 
 # datasette-acl is a hard dependency: the per-list permission model resolves
 # through acl grants and friendly roles, so its role factory is always
 # importable.
-from datasette_acl.roles import standard_roles
+from datasette_acl.roles import AclRole, standard_roles
 
 # datasette-acl-share is a hard dependency: the list page hosts its
 # <datasette-acl-share-dialog>, so its asset helper is always importable.
 from datasette_acl_share import datasette_share_assets as _share_assets
 
+from . import hookspecs
 from .router import router
 from .permissions import (  # noqa: F401
     ACTION_CREATE,
     ACTION_EDIT,
+    ACTION_GEOCODER_ADMIN,
+    ACTION_GEOCODER_MANAGE,
+    ACTION_GEOCODER_USE,
     ACTION_LIST,
     ACTION_MANAGE,
     ACTION_VIEW,
+    PlacesGeocoderResource,
     PlacesListResource,
+    PLACES_GEOCODER_RESOURCE_TYPE,
     PLACES_LIST_RESOURCE_TYPE,
+    grant_geocoder_use_actor,
+    grant_geocoder_use_everyone,
 )
+from .geocoders.opencage import OpenCageProvider
+from .util import places_db
 from . import routes  # noqa: F401 — triggers decorator registration
 
 # datasette-paper integration. Importing the hookimpl into this module's
 # namespace makes Datasette discover it (pluggy scans the entry-point module);
 # the hook only fires when datasette-paper is installed and owns the spec.
 from .paper import paper_embed_provider  # noqa: F401
+
+# Register datasette-places' own plugin hooks (the geocoder-provider registry).
+pm.add_hookspecs(hookspecs)
 
 
 # The list page is the only places page that hosts <datasette-acl-share-dialog>, so
@@ -158,7 +172,36 @@ def register_actions(datasette):
             resource_class=PlacesListResource,
             also_requires=ACTION_VIEW,
         ),
+        # --- Geocoder instances --------------------------------------------
+        # Global admin of the geocoder catalog (create/edit/delete instances).
+        Action(
+            name=ACTION_GEOCODER_ADMIN,
+            description="Can create, edit, and delete geocoder instances",
+        ),
+        # Per-instance, acl-backed: who may use (and attach) a geocoder, and
+        # who may manage its sharing.
+        Action(
+            name=ACTION_GEOCODER_USE,
+            description="Use a geocoder (and attach it to a list)",
+            resource_class=PlacesGeocoderResource,
+        ),
+        Action(
+            name=ACTION_GEOCODER_MANAGE,
+            description="Manage sharing for a geocoder",
+            resource_class=PlacesGeocoderResource,
+            also_requires=ACTION_GEOCODER_USE,
+        ),
     ]
+
+
+@hookimpl
+def register_places_geocoder_providers(datasette):
+    """Built-in geocoder provider types shipped by datasette-places.
+
+    Registered through the plugin's own hook (dogfooding it) so third-party
+    provider types compose the same way. ``pluto`` is added in a later phase.
+    """
+    return {"opencage": OpenCageProvider.from_instance}
 
 
 @hookimpl
@@ -170,7 +213,7 @@ def datasette_acl_roles(datasette):
     canonical cumulative Viewer / Editor / Manager triple (Manager carries
     ``manage=True``, so ``places-manage`` authorizes re-sharing).
     """
-    return standard_roles(
+    list_roles = standard_roles(
         PLACES_LIST_RESOURCE_TYPE,
         view=ACTION_VIEW,
         edit=ACTION_EDIT,
@@ -181,6 +224,28 @@ def datasette_acl_roles(datasette):
             "Manager": "Can view, edit, and manage sharing",
         },
     )
+    # Geocoder instances use a two-rung User / Manager pair (built by hand since
+    # standard_roles is fixed to the Viewer/Editor/Manager triple): User can use
+    # and attach the geocoder; Manager additionally manages sharing. The
+    # manage-only ``geocoder-manage`` action is what acl's can_manage requires.
+    geocoder_roles = [
+        AclRole(
+            PLACES_GEOCODER_RESOURCE_TYPE,
+            "User",
+            [ACTION_GEOCODER_USE],
+            rank=1,
+            description="Can use and attach this geocoder",
+        ),
+        AclRole(
+            PLACES_GEOCODER_RESOURCE_TYPE,
+            "Manager",
+            [ACTION_GEOCODER_USE, ACTION_GEOCODER_MANAGE],
+            rank=2,
+            manage=True,
+            description="Can use, attach, and manage sharing",
+        ),
+    ]
+    return list_roles + geocoder_roles
 
 
 @hookimpl
@@ -204,6 +269,69 @@ async def startup(datasette):
 
     internal = datasette.get_internal_database()
     await ensure_migrations(internal)
+    await _seed_geocoders_from_config(datasette)
+
+
+async def _seed_geocoders_from_config(datasette):
+    """Upsert geocoder instances declared in plugin config and seed their grants.
+
+    Lets a deployment define geocoders declaratively in ``datasette.yaml``::
+
+        plugins:
+          datasette-places:
+            geocoders:
+              - id: opencage-global
+                provider_type: opencage
+                label: OpenCage (worldwide)
+                public: true
+              - id: pluto-la
+                provider_type: pluto
+                label: "PLUTO — Los Angeles"
+                config: { database: pluto_la }
+                grant_use: { actors: [alice, bob] }
+
+    Idempotent: re-running updates label/config/enabled and re-applies grants
+    (acl grants are idempotent). Group grants are intentionally not seeded here
+    (resolve groups via the share UI); ``public``/``grant_use.everyone`` and
+    per-actor grants are supported.
+    """
+    import json as _json
+
+    config = datasette.plugin_config("datasette-places") or {}
+    specs = config.get("geocoders") or []
+    if not specs:
+        return
+    db = places_db(datasette)
+    for spec in specs:
+        gid = (spec.get("id") or "").strip()
+        provider_type = (spec.get("provider_type") or "").strip()
+        if not gid or not provider_type:
+            continue
+        label = (spec.get("label") or gid).strip()
+        config_json = _json.dumps(spec.get("config") or {})
+        enabled = bool(spec.get("enabled", True))
+        existing = await db.select_geocoder_by_id(gid)
+        if existing is None:
+            await db.insert_geocoder(
+                id=gid,
+                provider_type=provider_type,
+                label=label,
+                config_json=config_json,
+                enabled=enabled,
+                created_by=None,
+            )
+        else:
+            await db.update_geocoder(
+                geocoder_id=gid,
+                label=label,
+                config_json=config_json,
+                enabled=enabled,
+            )
+        grant_use = spec.get("grant_use") or {}
+        if spec.get("public") or grant_use.get("everyone"):
+            await grant_geocoder_use_everyone(datasette, gid, by_actor="config-seed")
+        for actor in grant_use.get("actors") or []:
+            await grant_geocoder_use_actor(datasette, gid, actor)
 
 
 # Bootstrap `bi-geo-alt-fill` location marker — used as the sidebar icon.

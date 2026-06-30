@@ -9,6 +9,9 @@ build/
 .venv/
 node_modules/
 
+# Screenshot harness tile cache (real map tiles, fetched + cached on first run)
+frontend/scripts/shots/.tile-cache/
+
 # Vite build output (generated)
 datasette_places/static/gen/
 datasette_places/manifest.json

@@ -146,3 +146,102 @@ RETURNING id, list_id, name, address, latitude, longitude, notes, color, metadat
 
 -- name: deletePlace
 DELETE FROM _datasette_places_place WHERE id = $place_id::integer;
+
+-- ============================================================================
+-- Geocoder instances
+--
+-- Every Geocoder-returning query selects the same column set so the generated
+-- ``Geocoder`` dataclass has one shape:
+--   id, provider_type, label, config_json, enabled, created_by, created_at, updated_at
+-- ============================================================================
+
+-- name: insertGeocoder :row -> Geocoder
+INSERT INTO _datasette_places_geocoder (id, provider_type, label, config_json, enabled, created_by)
+VALUES ($id::text, $provider_type::text, $label::text, $config_json::text, $enabled::integer, $created_by::text::)
+RETURNING id, provider_type, label, config_json, enabled, created_by, created_at, updated_at;
+
+-- name: selectGeocoderById :row -> Geocoder
+SELECT id, provider_type, label, config_json, enabled, created_by, created_at, updated_at
+FROM _datasette_places_geocoder
+WHERE id = $id::text;
+
+-- name: listGeocoders :rows -> Geocoder
+SELECT id, provider_type, label, config_json, enabled, created_by, created_at, updated_at
+FROM _datasette_places_geocoder
+ORDER BY label COLLATE NOCASE ASC;
+
+-- name: listGeocodersByIds :rows -> Geocoder
+SELECT g.id, g.provider_type, g.label, g.config_json, g.enabled, g.created_by, g.created_at, g.updated_at
+FROM _datasette_places_geocoder g
+JOIN json_each($ids_json::text) je ON je.value = g.id
+ORDER BY g.label COLLATE NOCASE ASC;
+
+-- name: updateGeocoder :row -> Geocoder
+UPDATE _datasette_places_geocoder
+SET label = $label::text,
+    config_json = $config_json::text,
+    enabled = $enabled::integer,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+WHERE id = $id::text
+RETURNING id, provider_type, label, config_json, enabled, created_by, created_at, updated_at;
+
+-- name: deleteGeocoder
+DELETE FROM _datasette_places_geocoder WHERE id = $id::text;
+
+-- ============================================================================
+-- Per-list geocoder attachments
+--
+-- Every ListGeocoder-returning query selects the same column set:
+--   list_id, geocoder_id, enabled, is_default, position, added_by, added_at
+-- listGeocodersForList joins the instance columns for display (ListGeocoderRow).
+-- ============================================================================
+
+-- name: attachGeocoderToList :row -> ListGeocoder
+INSERT INTO _datasette_places_list_geocoder (list_id, geocoder_id, enabled, is_default, position, added_by)
+VALUES ($list_id::integer, $geocoder_id::text, 1, 0,
+        (SELECT COALESCE(MAX(position), -1) + 1 FROM _datasette_places_list_geocoder WHERE list_id = $list_id::integer),
+        $added_by::text::)
+ON CONFLICT (list_id, geocoder_id) DO UPDATE SET enabled = 1
+RETURNING list_id, geocoder_id, enabled, is_default, position, added_by, added_at;
+
+-- name: selectListGeocoder :row -> ListGeocoder
+SELECT list_id, geocoder_id, enabled, is_default, position, added_by, added_at
+FROM _datasette_places_list_geocoder
+WHERE list_id = $list_id::integer AND geocoder_id = $geocoder_id::text;
+
+-- listGeocodersForList joins instance columns so the API can render the
+-- attachment without a second lookup.
+-- name: listGeocodersForList :rows -> ListGeocoderRow
+SELECT lg.list_id, lg.geocoder_id, lg.enabled, lg.is_default, lg.position,
+       g.provider_type, g.label, g.config_json, g.enabled AS geocoder_enabled
+FROM _datasette_places_list_geocoder lg
+JOIN _datasette_places_geocoder g ON g.id = lg.geocoder_id
+WHERE lg.list_id = $list_id::integer
+ORDER BY lg.position ASC, g.label COLLATE NOCASE ASC;
+
+-- name: defaultGeocoderForList :value
+SELECT geocoder_id
+FROM _datasette_places_list_geocoder
+WHERE list_id = $list_id::integer AND is_default = 1 AND enabled = 1
+LIMIT 1;
+
+-- name: setListGeocoderEnabled
+UPDATE _datasette_places_list_geocoder
+SET enabled = $enabled::integer
+WHERE list_id = $list_id::integer AND geocoder_id = $geocoder_id::text;
+
+-- Clear every default flag for a list (called before setting a new default so
+-- at most one row is is_default=1).
+-- name: clearListGeocoderDefault
+UPDATE _datasette_places_list_geocoder
+SET is_default = 0
+WHERE list_id = $list_id::integer;
+
+-- name: setListGeocoderDefault
+UPDATE _datasette_places_list_geocoder
+SET is_default = 1
+WHERE list_id = $list_id::integer AND geocoder_id = $geocoder_id::text;
+
+-- name: detachGeocoderFromList
+DELETE FROM _datasette_places_list_geocoder
+WHERE list_id = $list_id::integer AND geocoder_id = $geocoder_id::text;
