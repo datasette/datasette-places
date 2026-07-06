@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import L from "leaflet";
+  import type { Field, MetaValue } from "./fields";
+  import { sortedFields, fieldValueHtml } from "./fields";
 
   type PlacePin = {
     id: number;
@@ -10,10 +12,12 @@
     longitude: number;
     color: string;
     shape: string;
+    metadata?: Record<string, MetaValue> | null;
   };
 
   let {
     places = [],
+    fields = [],
     selectedId = null,
     previewPin = null,
     canEdit = false,
@@ -25,6 +29,7 @@
     onMovePlace,
   }: {
     places: PlacePin[];
+    fields?: Field[];
     selectedId: number | null;
     previewPin: { latitude: number; longitude: number; name: string } | null;
     canEdit?: boolean;
@@ -97,6 +102,22 @@
     return L.divIcon({ className: cls, html, iconSize, iconAnchor });
   }
 
+  /** Rows for the place's custom-field values, in display order; "" if none. */
+  function popupFieldsHtml(p: PlacePin): string {
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const meta = p.metadata || {};
+    const rows = sortedFields(fields)
+      .map((f) => {
+        const html = fieldValueHtml(f, meta[f.key]);
+        return html
+          ? `<div class="pp-field"><span class="pp-flabel">${esc(f.label)}</span><span class="pp-fval">${html}</span></div>`
+          : "";
+      })
+      .join("");
+    return rows ? `<div class="pp-fields">${rows}</div>` : "";
+  }
+
   function popupHtml(p: PlacePin): string {
     const dir = `https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`;
     const esc = (s: string) =>
@@ -105,6 +126,7 @@
       <strong>${esc(p.name)}</strong>
       ${p.address ? `<div class="pp-addr">${esc(p.address)}</div>` : ""}
       <div class="pp-coord">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</div>
+      ${popupFieldsHtml(p)}
       <a href="${dir}" target="_blank" rel="noopener" class="pp-dir">Directions ↗</a>
     </div>`;
   }
@@ -189,9 +211,10 @@
   });
 
   $effect(() => {
-    // Re-render markers whenever places, selection, or edit-rights change,
-    // then re-focus the selected marker.
+    // Re-render markers whenever places, fields (popup contents), selection, or
+    // edit-rights change, then re-focus the selected marker.
     void places;
+    void fields;
     void selectedId;
     void canEdit;
     renderMarkers();
@@ -317,26 +340,136 @@
   :global(.place-marker.selected svg) {
     filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.55));
   }
+  /* A touch more room than Leaflet's default cramped popup. */
+  :global(.leaflet-popup-content) {
+    margin: 11px 15px;
+    min-width: 180px;
+  }
+  /* Full-margin shorthands everywhere so datasette-paper's prose CSS (which the
+     embed inherits) can't inflate the popup's vertical rhythm. */
   :global(.place-popup) {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     font-size: 0.9em;
-    line-height: 1.45;
+    line-height: 1.35;
+  }
+  :global(.place-popup strong) {
+    display: block;
+    font-size: 1.05em;
+    margin: 0 0 1px;
   }
   :global(.place-popup .pp-addr) {
     color: #555;
+    margin: 1px 0 0;
   }
   :global(.place-popup .pp-coord) {
     color: #888;
     font-variant-numeric: tabular-nums;
-    margin-top: 2px;
+    margin: 1px 0 0;
   }
   :global(.place-popup .pp-dir) {
     display: inline-block;
-    margin-top: 4px;
+    margin: 7px 0 0;
     color: #0b5cad;
     text-decoration: none;
   }
   :global(.place-popup .pp-dir:hover) {
     text-decoration: underline;
+  }
+
+  /* Custom-field values inside a marker popup. */
+  :global(.place-popup .pp-fields) {
+    margin: 7px 0 0;
+    padding-top: 7px;
+    border-top: 1px solid #eee;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 5px 18px;
+  }
+  :global(.place-popup .pp-field) {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  :global(.place-popup .pp-flabel) {
+    color: #888;
+    font-size: 0.92em;
+  }
+  :global(.place-popup .pp-fval) {
+    color: #222;
+  }
+  :global(.place-popup .ppf-stars) {
+    white-space: nowrap;
+  }
+  :global(.place-popup .ppf-star svg) {
+    vertical-align: -0.125em;
+  }
+  :global(.place-popup .ppf-star.full),
+  :global(.place-popup .ppf-star.half) {
+    color: #f5a623;
+  }
+  :global(.place-popup .ppf-star.empty) {
+    color: #ccc;
+  }
+  /* When shown inside a datasette-paper embed, the popup inherits paper's prose
+     styles (block margins / tall line-height) which inflate it. Force the
+     compact rhythm with !important so those inherited rules can't win. */
+  :global(.place-popup),
+  :global(.place-popup strong),
+  :global(.place-popup .pp-addr),
+  :global(.place-popup .pp-coord),
+  :global(.place-popup .pp-dir),
+  :global(.place-popup .pp-fields),
+  :global(.place-popup .pp-field) {
+    line-height: 1.35 !important;
+    padding: 0 !important;
+  }
+  /* Spacing comes from the flex `gap`; zero the children's own margins so
+     inherited prose margins can't add to it. Fields/Directions get a little
+     extra separation. */
+  :global(.place-popup strong),
+  :global(.place-popup .pp-addr),
+  :global(.place-popup .pp-coord) {
+    margin: 0 !important;
+  }
+  :global(.place-popup .pp-fields) {
+    padding-top: 7px !important;
+    margin: 5px 0 0 !important;
+  }
+  :global(.place-popup .pp-dir) {
+    margin: 5px 0 0 !important;
+  }
+  :global(.place-popup .ppf-chip) {
+    display: inline-block;
+    padding: 0 7px;
+    border-radius: 10px;
+    background: #eef1f4;
+    color: #333;
+    font-size: 0.85em;
+    line-height: 1.5;
+  }
+  :global(.place-popup .ppf-chips) {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+  :global(.place-popup .ppf-link) {
+    color: #0b5cad;
+    text-decoration: none;
+  }
+  :global(.place-popup .ppf-link:hover) {
+    text-decoration: underline;
+  }
+  :global(.place-popup .ppf-swatch) {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    vertical-align: -1px;
+    margin-right: 4px;
   }
 
   .map-toolbar {

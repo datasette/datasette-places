@@ -3,6 +3,9 @@
   import MapView from "./MapView.svelte";
   import AddressSearch from "./AddressSearch.svelte";
   import PlacesList from "./PlacesList.svelte";
+  import FieldsPanel from "./FieldsPanel.svelte";
+  import PlacesTable from "./PlacesTable.svelte";
+  import type { Field, MetaValue } from "./fields";
   // The <datasette-acl-share-dialog> custom element is registered by the
   // datasette-acl-share JS bundle, which places' extra_js_urls hook includes on
   // the list page — no component import needed here.
@@ -20,11 +23,13 @@
     longitude: number;
     notes: string | null;
     color: string | null;
-    metadata: Record<string, string> | null;
+    metadata: Record<string, MetaValue> | null;
     created_by: string | null;
     created_at: string;
     updated_at: string;
   };
+
+  type UpdateResult = { ok: boolean; errors?: Record<string, string> };
 
   type GeoResult = {
     display_name: string;
@@ -47,6 +52,7 @@
       canManage: boolean;
       isOwner: boolean;
     };
+    fields: Field[];
   };
 
   let {
@@ -79,6 +85,10 @@
   // Map "add" mode, surfaced in the floating panel (the in-map toolbar button
   // can sit behind other chrome like the datasette debug bar).
   let addMode = $state(false);
+  // Map vs spreadsheet (Table) view of the same places.
+  let viewMode = $state<"map" | "table">("map");
+
+  let fields = $derived(listDetail?.fields ?? []);
 
   /** First, most-specific part of a comma-separated address — a sane title default. */
   function shortLabel(label: string): string {
@@ -190,7 +200,10 @@
     }
   }
 
-  async function onUpdatePlace(id: number, updates: Partial<Place>) {
+  async function onUpdatePlace(
+    id: number,
+    updates: Partial<Place>
+  ): Promise<UpdateResult> {
     try {
       const resp = await fetch(
         `/-/places/api/lists/${listId}/places/${id}/update`,
@@ -200,11 +213,37 @@
           body: JSON.stringify(updates),
         }
       );
+      if (resp.status === 400) {
+        // Per-field validation failures: {errors:{<key>:msg}}.
+        const data = await resp.json().catch(() => ({}));
+        return { ok: false, errors: data.errors };
+      }
       if (!resp.ok) throw new Error("Failed to update");
       const updated = await resp.json();
       places = places.map((p) => (p.id === id ? updated : p));
+      return { ok: true };
     } catch {
       error = "Failed to update place";
+      return { ok: false };
+    }
+  }
+
+  // Replace a place in local state (used by the table's per-key inline edits,
+  // which call the metadata endpoint directly and return the updated place).
+  function onPlaceUpdated(updated: Place) {
+    places = places.map((p) => (p.id === updated.id ? updated : p));
+  }
+
+  // Re-fetch just the list detail after a field-def change so `fields` reflects
+  // the new schema without disturbing the loaded places / selection.
+  async function reloadFields() {
+    try {
+      const resp = await fetch(`/-/places/api/lists/${listId}`, {
+        headers: { "Content-Type": "application/json" },
+      });
+      if (resp.ok) listDetail = await resp.json();
+    } catch {
+      error = "Failed to reload fields";
     }
   }
 
@@ -308,7 +347,8 @@
       latitude: p.latitude,
       longitude: p.longitude,
       color: p.color || "#3b82f6",
-      shape: p.metadata?.shape || "pin",
+      shape: String(p.metadata?.shape || "pin"),
+      metadata: p.metadata,
     }))
   );
 
@@ -326,7 +366,21 @@
   {:else if error && !listDetail}
     <div class="error-screen">{error}</div>
   {:else if listDetail}
-    <main class="map-area">
+    <div class="stage" class:split={viewMode === "table"}>
+    {#if viewMode === "table"}
+      <section class="table-pane">
+        <PlacesTable
+          {places}
+          {fields}
+          {listId}
+          {canEdit}
+          {selectedId}
+          onSelectPlace={onSelectPlace}
+          onPlaceUpdated={onPlaceUpdated}
+        />
+      </section>
+    {/if}
+    <section class="map-pane">
       {#if canEdit}
         <div class="map-search-overlay">
           <AddressSearch onSelect={onSearchSelect} />
@@ -368,6 +422,7 @@
       {/if}
       <MapView
         places={mapPlaces}
+        {fields}
         {selectedId}
         {previewPin}
         {canEdit}
@@ -376,7 +431,8 @@
         onMapClick={onMapClick}
         onMovePlace={onMovePlace}
       />
-    </main>
+    </section>
+    </div>
 
     <aside class="floating-panel">
       <div class="panel-header">
@@ -401,6 +457,7 @@
             {/if}
           {/if}
           {#if canManage}
+            <FieldsPanel {listId} {fields} onChanged={reloadFields} />
             <!-- The <datasette-acl-share-dialog> custom element (registered by the
                  datasette-acl-share bundle) is self-contained: it renders its OWN
                  trigger button + dialog and talks to the acl JSON API directly. We
@@ -445,10 +502,22 @@
           </button>
         {/if}
 
-        <div class="meta-line">
-          {places.length}
-          {places.length === 1 ? "place" : "places"}
-          · edited {relativeTime(listDetail.updated_at)}
+        <div class="meta-row">
+          <div class="meta-line">
+            {places.length}
+            {places.length === 1 ? "place" : "places"}
+            · edited {relativeTime(listDetail.updated_at)}
+          </div>
+          <button
+            type="button"
+            class="view-toggle-btn"
+            class:active={viewMode === "table"}
+            aria-pressed={viewMode === "table"}
+            title={viewMode === "table" ? "Hide the table" : "Show a table of all places"}
+            onclick={() => (viewMode = viewMode === "table" ? "map" : "table")}
+          >
+            ▤ Table
+          </button>
         </div>
 
         {#if canEdit}
@@ -467,14 +536,17 @@
         {/if}
       </div>
 
-      <PlacesList
-        {places}
-        {selectedId}
-        {canEdit}
-        onSelectPlace={onSelectPlace}
-        onDeletePlace={onDeletePlace}
-        onUpdatePlace={onUpdatePlace}
-      />
+      {#if viewMode === "map"}
+        <PlacesList
+          {places}
+          {fields}
+          {selectedId}
+          {canEdit}
+          onSelectPlace={onSelectPlace}
+          onDeletePlace={onDeletePlace}
+          onUpdatePlace={onUpdatePlace}
+        />
+      {/if}
     </aside>
   {/if}
 </div>
@@ -604,8 +676,14 @@
     border-radius: 3px;
     resize: vertical;
   }
+  .meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+  }
   .meta-line {
-    margin-top: 4px;
     font-size: 0.78em;
     color: #888;
   }
@@ -703,9 +781,52 @@
   .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-cancel:hover { background: #f0f0f0; }
 
-  .map-area {
+  /* The stage stacks its panes vertically. Map-only → the map fills it; in
+     "split" (table) view the table sits on top and the map stays below. */
+  .stage {
     position: absolute;
     inset: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .map-pane {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  /* In split view the table clears the floating panel on the left and scrolls
+     within its own pane. It fits its content but never takes more than ~62% of
+     the height, so a short list doesn't leave a gap and the map keeps the rest. */
+  .table-pane {
+    position: relative;
+    flex: 0 1 auto;
+    max-height: 62%;
+    overflow: auto;
+    background: #fff;
+    padding-left: 368px;
+    border-bottom: 1px solid #ddd;
+  }
+  /* Small, secondary toggle that matches the Fields/Share panel buttons rather
+     than a big primary call-to-action. Active = subtly tinted, not filled. */
+  .view-toggle-btn {
+    flex-shrink: 0;
+    font: inherit;
+    font-size: 0.82em;
+    padding: 4px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    color: #444;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .view-toggle-btn:hover {
+    background: #f0f0f0;
+  }
+  .view-toggle-btn.active {
+    background: #eef3fb;
+    border-color: #9cc0ec;
+    color: #0b5cad;
   }
 
   @media (max-width: 768px) {
@@ -724,6 +845,11 @@
       left: 50%;
       width: calc(100% - 88px);
       top: 8px;
+    }
+    /* Panel is a bottom sheet now, so the table pane uses the full width; the
+       map pane keeps the lower portion behind the sheet. */
+    .table-pane {
+      padding-left: 0;
     }
   }
 </style>

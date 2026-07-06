@@ -119,6 +119,14 @@ async def ensure_places_edit(datasette, request, list_id) -> None:
     )
 
 
+async def ensure_places_manage(datasette, request, list_id) -> None:
+    await datasette.ensure_permission(
+        action=ACTION_MANAGE,
+        resource=PlacesListResource(list_id),
+        actor=request.actor,
+    )
+
+
 async def can_places_edit(datasette, actor, list_id) -> bool:
     """Like ensure_places_edit but returns True/False without raising."""
     return await datasette.allowed(

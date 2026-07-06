@@ -1,4 +1,9 @@
 <script lang="ts">
+  import type { Field, MetaValue } from "./fields";
+  import { sortedFields } from "./fields";
+  import FieldValue from "./FieldValue.svelte";
+  import FieldInput from "./FieldInput.svelte";
+
   type Place = {
     id: number;
     name: string;
@@ -7,8 +12,10 @@
     longitude: number;
     notes: string | null;
     color: string | null;
-    metadata: Record<string, string> | null;
+    metadata: Record<string, MetaValue> | null;
   };
+
+  type UpdateResult = { ok: boolean; errors?: Record<string, string> };
 
   const SHAPES = ["pin", "circle", "square", "star", "flag"] as const;
   const SHAPE_GLYPH: Record<string, string> = {
@@ -21,6 +28,7 @@
 
   let {
     place,
+    fields = [],
     isSelected = false,
     canEdit = false,
     onSelect,
@@ -28,11 +36,12 @@
     onUpdate,
   }: {
     place: Place;
+    fields?: Field[];
     isSelected: boolean;
     canEdit: boolean;
     onSelect: () => void;
     onDelete: () => void;
-    onUpdate: (updates: Partial<Place>) => void;
+    onUpdate: (updates: Partial<Place>) => Promise<UpdateResult> | void;
   } = $props();
 
   let editing = $state(false);
@@ -40,9 +49,27 @@
   let editNotes = $state("");
   let editColor = $state("");
   let editShape = $state("pin");
+  // Per-field values being edited, keyed by field key.
+  let editMeta = $state<Record<string, MetaValue>>({});
+  let fieldErrors = $state<Record<string, string>>({});
+  let saving = $state(false);
   let cardEl: HTMLDivElement | undefined = $state();
 
-  let shape = $derived(place.metadata?.shape || "pin");
+  let orderedFields = $derived(sortedFields(fields));
+  // Declared fields that have a value to show in the read view.
+  let displayFields = $derived(
+    orderedFields.filter((f) => {
+      const v = place.metadata?.[f.key];
+      return !(
+        v === null ||
+        v === undefined ||
+        v === "" ||
+        (Array.isArray(v) && v.length === 0)
+      );
+    })
+  );
+
+  let shape = $derived(String(place.metadata?.shape || "pin"));
   let directionsUrl = $derived(
     `https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}`
   );
@@ -51,26 +78,70 @@
     editName = place.name;
     editNotes = place.notes || "";
     editColor = place.color || "#3b82f6";
-    editShape = place.metadata?.shape || "pin";
+    editShape = String(place.metadata?.shape || "pin");
+    editMeta = {};
+    for (const f of orderedFields) editMeta[f.key] = place.metadata?.[f.key];
+    fieldErrors = {};
     editing = true;
   }
 
-  function saveEdit() {
+  function isEmpty(v: MetaValue): boolean {
+    return (
+      v === null ||
+      v === undefined ||
+      v === "" ||
+      (Array.isArray(v) && v.length === 0)
+    );
+  }
+
+  // Merge edited field values onto the existing metadata, always preserving the
+  // reserved `shape` marker key + any undeclared keys the UI doesn't manage.
+  function buildMetadata(): Record<string, MetaValue> {
+    const meta: Record<string, MetaValue> = {
+      ...(place.metadata || {}),
+      shape: editShape,
+    };
+    for (const f of orderedFields) {
+      const v = editMeta[f.key];
+      if (isEmpty(v)) delete meta[f.key];
+      else meta[f.key] = v;
+    }
+    return meta;
+  }
+
+  async function saveEdit() {
     const updates: Record<string, unknown> = {};
     if (editName.trim() && editName !== place.name) updates.name = editName.trim();
     if (editNotes !== (place.notes || "")) updates.notes = editNotes;
     if (editColor !== (place.color || "#3b82f6")) updates.color = editColor;
-    if (editShape !== (place.metadata?.shape || "pin")) {
-      updates.metadata = { ...(place.metadata || {}), shape: editShape };
+    const newMeta = buildMetadata();
+    // Normalize the baseline's implicit shape default so an unchanged edit
+    // doesn't write a redundant {shape:"pin"}.
+    const baseline: Record<string, MetaValue> = { ...(place.metadata || {}) };
+    if (baseline.shape === undefined) baseline.shape = "pin";
+    if (JSON.stringify(newMeta) !== JSON.stringify(baseline)) {
+      updates.metadata = newMeta;
     }
-    if (Object.keys(updates).length > 0) {
-      onUpdate(updates as Partial<Place>);
+    if (Object.keys(updates).length === 0) {
+      editing = false;
+      return;
+    }
+    saving = true;
+    fieldErrors = {};
+    const result = await onUpdate(updates as Partial<Place>);
+    saving = false;
+    if (result && !result.ok) {
+      if (result.errors && Object.keys(result.errors).length > 0) {
+        fieldErrors = result.errors;
+        return; // keep the form open so the user can fix the values
+      }
     }
     editing = false;
   }
 
   function cancelEdit() {
     editing = false;
+    fieldErrors = {};
   }
 
   function onKeydown(e: KeyboardEvent) {
@@ -147,14 +218,37 @@
         rows="3"
         onkeydown={onKeydown}
       ></textarea>
+      {#each orderedFields as f (f.id)}
+        <div class="attr-field">
+          <label for={`f-${place.id}-${f.key}`}>
+            {f.label}{#if f.required}<span class="req">*</span>{/if}
+          </label>
+          <FieldInput field={f} bind:value={editMeta[f.key]} />
+          {#if fieldErrors[f.key]}
+            <div class="field-error">{fieldErrors[f.key]}</div>
+          {/if}
+        </div>
+      {/each}
       <div class="edit-actions">
-        <button type="button" class="btn-save" onclick={saveEdit}>Save</button>
+        <button type="button" class="btn-save" disabled={saving} onclick={saveEdit}>
+          {saving ? "Saving..." : "Save"}
+        </button>
         <button type="button" class="btn-cancel" onclick={cancelEdit}>Cancel</button>
       </div>
     </div>
   {:else}
     {#if place.notes}
       <div class="notes">{place.notes}</div>
+    {/if}
+    {#if displayFields.length > 0}
+      <dl class="attrs">
+        {#each displayFields as f (f.id)}
+          <div class="attr-row">
+            <dt>{f.label}</dt>
+            <dd><FieldValue field={f} value={place.metadata?.[f.key]} /></dd>
+          </div>
+        {/each}
+      </dl>
     {/if}
     {#if isSelected}
       <div class="detail">
@@ -330,6 +424,46 @@
   .shape-opt.active {
     border-color: #0b5cad;
     box-shadow: 0 0 0 1px #0b5cad inset;
+  }
+  .attr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .attr-field > label {
+    font-size: 0.78em;
+    color: #666;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .attr-field .req {
+    color: #c0392b;
+  }
+  .field-error {
+    color: #8a1a1a;
+    font-size: 0.78em;
+  }
+  .attrs {
+    margin: 6px 0 0;
+    padding-left: 24px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 10px;
+    font-size: 0.82em;
+  }
+  .attr-row {
+    display: contents;
+  }
+  .attrs dt {
+    color: #888;
+  }
+  .attrs dd {
+    margin: 0;
+    color: #333;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .edit-actions {
     display: flex;

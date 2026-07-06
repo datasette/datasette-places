@@ -146,3 +146,76 @@ RETURNING id, list_id, name, address, latitude, longitude, notes, color, metadat
 
 -- name: deletePlace
 DELETE FROM _datasette_places_place WHERE id = $place_id::integer;
+
+-- ============================================================================
+-- List fields (user-defined per-list metadata schema)
+--
+-- Every ListField-returning query selects the same column set so the generated
+-- ``ListField`` dataclass has one shape:
+--   id, list_id, key, label, type, position, required, is_unique, config_json,
+--   created_at, updated_at
+-- ``key`` is whitelisted (^[a-z][a-z0-9_]{0,62}$) and reserved-checked in
+-- datasette_places.fields before it ever reaches these queries or the dynamic
+-- view DDL in db.py.
+-- ============================================================================
+
+-- name: insertListField :row -> ListField
+INSERT INTO _datasette_places_list_field
+    (list_id, key, label, type, position, required, is_unique, config_json)
+VALUES
+    ($list_id::integer, $key::text, $label::text, $type::text, $position::integer,
+     $required::integer, $is_unique::integer, $config_json::text)
+RETURNING id, list_id, key, label, type, position, required, is_unique, config_json, created_at, updated_at;
+
+-- name: selectFieldsForList :rows -> ListField
+SELECT id, list_id, key, label, type, position, required, is_unique, config_json, created_at, updated_at
+FROM _datasette_places_list_field
+WHERE list_id = $list_id::integer
+ORDER BY position ASC, id ASC;
+
+-- name: selectListFieldById :row -> ListField
+SELECT id, list_id, key, label, type, position, required, is_unique, config_json, created_at, updated_at
+FROM _datasette_places_list_field
+WHERE id = $field_id::integer;
+
+-- name: maxFieldPositionForList :value
+SELECT COALESCE(MAX(position), -1) FROM _datasette_places_list_field
+WHERE list_id = $list_id::integer;
+
+-- name: updateListField :row -> ListField
+UPDATE _datasette_places_list_field
+SET label = $label::text,
+    type = $type::text,
+    position = $position::integer,
+    required = $required::integer,
+    is_unique = $is_unique::integer,
+    config_json = $config_json::text,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+WHERE id = $field_id::integer
+RETURNING id, list_id, key, label, type, position, required, is_unique, config_json, created_at, updated_at;
+
+-- name: deleteListField
+DELETE FROM _datasette_places_list_field WHERE id = $field_id::integer;
+
+-- ============================================================================
+-- Per-key place metadata writes (json_set / json_remove)
+--
+-- Targeted single-attribute edits that avoid a read-modify-write of the whole
+-- metadata bag. ``$key`` is whitelisted before it reaches here; ``$value_json``
+-- is a JSON-encoded scalar so types round-trip. Reserved keys like ``shape``
+-- are preserved (json_set only touches the named path).
+-- ============================================================================
+
+-- name: setPlaceMetadataKey :row -> Place
+UPDATE _datasette_places_place
+SET metadata_json = json_set(COALESCE(metadata_json, '{}'), '$.' || $key::text, json($value_json::text)),
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+WHERE id = $place_id::integer
+RETURNING id, list_id, name, address, latitude, longitude, notes, color, metadata_json, created_by, created_at, updated_at;
+
+-- name: removePlaceMetadataKey :row -> Place
+UPDATE _datasette_places_place
+SET metadata_json = json_remove(COALESCE(metadata_json, '{}'), '$.' || $key::text),
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+WHERE id = $place_id::integer
+RETURNING id, list_id, name, address, latitude, longitude, notes, color, metadata_json, created_by, created_at, updated_at;

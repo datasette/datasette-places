@@ -53,3 +53,38 @@ def m001_initial(db: Database):
             ON _datasette_places_place(list_id);
         """
     )
+
+
+@migrations()
+def m002_list_fields(db: Database):
+    # User-defined per-list metadata fields (the "schema" for a list's places).
+    # Each row declares one custom attribute every place in the list may fill in.
+    # ``key`` is BOTH the JSON path segment in ``_datasette_places_place.metadata_json``
+    # AND the column name in the per-list expanded view, so it is whitelisted to
+    # ``^[a-z][a-z0-9_]{0,62}$`` and may not collide with reserved keys (shape,
+    # color, name, …) — enforced in datasette_places.fields, not the schema.
+    # ``type`` selects an editor/renderer/validator (text|number|url|rating|
+    # select|color|icon|boolean|date). ``config_json`` holds type-specific config
+    # (e.g. select ``options``, rating ``max``). ``required``/``is_unique`` are
+    # validation flags; uniqueness is additionally enforced by a dynamic
+    # expression index built in db.rebuild_list_artifacts.
+    db.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS _datasette_places_list_field (
+            id          INTEGER PRIMARY KEY NOT NULL,
+            list_id     INTEGER NOT NULL REFERENCES _datasette_places_list(id) ON DELETE CASCADE,
+            key         TEXT NOT NULL,
+            label       TEXT NOT NULL,
+            type        TEXT NOT NULL,
+            position    INTEGER NOT NULL DEFAULT 0,
+            required    INTEGER NOT NULL DEFAULT 0,
+            is_unique   INTEGER NOT NULL DEFAULT 0,
+            config_json TEXT NOT NULL DEFAULT '{}',
+            created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            UNIQUE (list_id, key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_places_list_field_list
+            ON _datasette_places_list_field(list_id);
+        """
+    )
